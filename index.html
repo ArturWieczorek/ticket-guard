@@ -488,6 +488,10 @@
           stop_camera: "Zatrzymaj kamerę",
           attempts_title: "Powtórne próby wejścia",
           attempts_entry: (num, code, count, when) => `#${num} (kod ${code}) - ${count}x, ostatnio ${when}`,
+          cant_verify: "Nie można zweryfikować",
+          cant_verify_sub: "Brak połączenia z bazą - użyj wydrukowanej listy zapasowej, aby sprawdzić ten bilet.",
+          cant_verify_auth:
+            "Problem z logowaniem lub uprawnieniami - wyloguj się i zaloguj ponownie, a potem spróbuj jeszcze raz.",
           no_events_scan: "Brak wydarzeń - najpierw utwórz jedno w zakładce Generuj.",
           pick_event_first: "Najpierw wybierz wydarzenie",
           camera_unavailable: "Kamera niedostępna",
@@ -572,6 +576,9 @@
           stop_camera: "Stop camera",
           attempts_title: "Repeat entry attempts",
           attempts_entry: (num, code, count, when) => `#${num} (code ${code}) - ${count}x, last ${when}`,
+          cant_verify: "Can't verify",
+          cant_verify_sub: "No connection to the database - use the printed backup list to check this ticket.",
+          cant_verify_auth: "Sign-in or permissions problem - sign out and back in, then try again.",
           no_events_scan: "No events yet - create one in the Generate tab first.",
           pick_event_first: "Pick an event first",
           camera_unavailable: "Camera unavailable",
@@ -1134,13 +1141,15 @@
       }
 
       // ================= SCAN PANEL =================
+      // Online-only verdicts: a ticket is ONLY ever declared valid or already-used
+      // by the shared database (the tryCheckIn transaction). With no connection the
+      // app does NOT guess from a cache - it says "can't verify, use the paper
+      // list". This keeps the exactly-once guarantee absolute and removes any
+      // chance of two devices disagreeing.
       let scanStream = null,
         scanRAF = null,
         currentEventId = null;
-      let localTickets = null; // working copy loaded once when scanning starts
-      let pendingSync = false; // true if local changes haven't reached the shared backend yet
-      let syncTimer = null;
-      let authIssue = false; // true if failures look like a sign-in/permissions problem, not a real outage
+      let localTickets = null; // event ticket list for stats/labels only (never a verdict source)
 
       // ---------- repeat-attempt log (per device, per event) ----------
       // A glance-able history of tickets that were scanned again AFTER already
@@ -1210,37 +1219,6 @@
             .join("");
       }
 
-      // ---------- offline cache (localStorage) ----------
-      // Persist the loaded ticket list AND any not-yet-synced check-ins for an event,
-      // so a scanner can (a) COLD-START with no network at all from the last cached
-      // list, and (b) survive a tab reload without losing queued offline check-ins.
-      // Best-effort only - private-mode/full storage failures are swallowed.
-      function scanCacheKey(eventId) {
-        return "tg_scan_" + eventId;
-      }
-      function saveScanCache() {
-        if (!currentEventId) return;
-        try {
-          localStorage.setItem(
-            scanCacheKey(currentEventId),
-            JSON.stringify({
-              tickets: localTickets || [],
-              pending: pendingQueue,
-            }),
-          );
-        } catch (e) {
-          /* storage unavailable/full - non-fatal, live path still works */
-        }
-      }
-      function loadScanCache(eventId) {
-        try {
-          const raw = localStorage.getItem(scanCacheKey(eventId));
-          return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-          return null;
-        }
-      }
-
       async function renderScanPanel() {
         const el = document.getElementById("panel-scan");
         const events = await getEvents();
@@ -1270,17 +1248,8 @@
           area.innerHTML = `<div class="result-banner invalid" style="display:block;">${t("pick_event_first")}</div>`;
           return;
         }
-        // Fresh session: clear anything left over from a previous event or a
-        // previous stop/start cycle so old conflicts/pending items can't bleed in.
+        // Fresh session: release any previous camera loop.
         haltCamera();
-        if (syncTimer) {
-          clearInterval(syncTimer);
-          syncTimer = null;
-        }
-        pendingQueue.length = 0;
-        conflicts.length = 0;
-        pendingSync = false;
-        authIssue = false;
         // Load this device's repeat-attempt history for the event (accumulates
         // across stop/start and reloads).
         reuseAttempts = loadAttempts(currentEventId);
@@ -1292,7 +1261,6 @@
       <div class="scan-frame"></div>
     </div>
     <div class="result-banner" id="result-banner"></div>
-    <div id="sync-note" style="text-align:center;font-size:12px;color:#8a8272;margin-top:8px;"></div>
     <div class="stats" id="scan-stats" style="justify-content:center;"></div>
     <div id="attempts-panel" class="no-print" style="max-width:420px;margin:14px auto 0;display:none;"></div>
     <div style="text-align:center;margin-top:14px;">
@@ -1302,46 +1270,9 @@
         document.getElementById("btn-stop-scan").onclick = stopScanning;
         renderAttemptsList();
 
-        // Load the ticket list ONCE. From here on, scanning works off this local
-        // copy so a dropped connection mid-event doesn't stop check-ins - it just
-        // delays syncing that data to other devices until the connection returns.
+        // Load the event's ticket list for stats/labels only. It is NEVER used to
+        // decide a verdict - only tryCheckIn (the DB) does that.
         localTickets = await getTickets(currentEventId);
-
-        // Hydrate from the offline cache: fall back to it entirely on a cold start
-        // with no network, otherwise fold in any check-ins that were marked locally
-        // but haven't reached the shared DB yet, and resume a queue left by a reload.
-        const cache = loadScanCache(currentEventId);
-        if (cache && Array.isArray(cache.tickets)) {
-          const pendingIds = new Set(Array.isArray(cache.pending) ? cache.pending : []);
-          if (!localTickets || localTickets.length === 0) {
-            // Cold start with no network: the cache is all we have to go on.
-            localTickets = cache.tickets;
-          } else {
-            // Online (fresh DB list loaded): the DB is authoritative. Only preserve
-            // a locally-marked "used" flag for check-ins THIS device made offline
-            // and has NOT synced yet (still queued). Never let a stale cache mark a
-            // ticket used when the DB says it is free - that caused the scanner and
-            // the desktop to disagree.
-            const cachedUsed = new Map(
-              cache.tickets.filter((t) => t.used && pendingIds.has(t.id)).map((t) => [t.id, t.usedAt]),
-            );
-            localTickets.forEach((t) => {
-              if (cachedUsed.has(t.id) && !t.used) {
-                t.used = true;
-                t.usedAt = cachedUsed.get(t.id);
-              }
-            });
-          }
-          if (Array.isArray(cache.pending) && cache.pending.length) {
-            cache.pending.forEach((id) => {
-              if (!pendingQueue.includes(id)) pendingQueue.push(id);
-            });
-            pendingSync = true;
-            renderSyncNote();
-            if (!syncTimer) syncTimer = setInterval(retrySync, 6000);
-          }
-        }
-        saveScanCache();
         lastDecodeTime = 0;
         lastDecodeData = null;
 
@@ -1376,10 +1307,6 @@
 
       function stopScanning() {
         haltCamera();
-        if (syncTimer) {
-          clearInterval(syncTimer);
-          syncTimer = null;
-        }
         renderScanPanel();
       }
 
@@ -1438,12 +1365,10 @@
         processCheckIn(parsed.t);
       }
 
-      const pendingQueue = []; // ticketIds marked locally while offline, awaiting sync
-
       async function processCheckIn(ticketId) {
-        // Live path first - this is what keeps two phones at the same door from
-        // both accepting the same ticket, since the transaction is resolved by
-        // the database itself, not by either phone's local memory.
+        // The database transaction is the ONLY thing that decides a verdict. This
+        // is what keeps two or three phones at the same door from ever both
+        // accepting the same ticket - the DB resolves it, not any phone's memory.
         const result = await tryCheckIn(ticketId);
 
         if (result.status === "ok") {
@@ -1463,72 +1388,10 @@
           return;
         }
 
-        // status === 'offline': network/database unreachable right now. Fall back
-        // to the local copy loaded at scan-start so the door keeps moving; this
-        // ticket gets queued and re-checked live the moment the connection returns.
-        if (result.reason === "auth") authIssue = true;
-        const idx = localTickets.findIndex((x) => x.id === ticketId);
-        if (idx === -1) {
-          showResult(false, t("unknown_offline"), t("unknown_offline_sub"));
-          return;
-        }
-        const ticket = localTickets[idx];
-        if (ticket.used) {
-          const when = new Date(ticket.usedAt).toLocaleTimeString();
-          showResult(false, t("already_used_offline"), t("marked_used_at", when));
-          recordReuseAttempt(ticketId, ticket.num, ticket.shortCode);
-          return;
-        }
-        ticket.used = true;
-        ticket.usedAt = new Date().toISOString();
-        pendingQueue.push(ticketId);
-        showResult(true, t("valid_offline"), t("checked_in_offline", String(ticket.num).padStart(3, "0")));
-        bumpLocalCount();
-        pendingSync = true;
-        renderSyncNote();
-        saveScanCache(); // persist so this check-in survives a reload before reconnect
-        if (!syncTimer) syncTimer = setInterval(retrySync, 6000);
-      }
-
-      async function retrySync() {
-        // A scanner that COLD-STARTED offline is pinned in memory mode (its startup
-        // storage probe failed). When the network returns we must re-probe, or its
-        // queued check-ins would never reach the shared DB. This is the crux of the
-        // "opened with no signal, reconnected later" emergency path.
-        if (STORAGE_MODE !== "firebase" && firebaseReady) {
-          await storageTest();
-        }
-        while (pendingQueue.length) {
-          const ticketId = pendingQueue[0];
-          const result = await tryCheckIn(ticketId);
-          if (result.status === "offline") {
-            if (result.reason === "auth") authIssue = true;
-            break; // still no connection (or still not signed in properly), try again later
-          }
-          pendingQueue.shift();
-          if (result.status === "used") {
-            // Someone else (or this same phone, earlier) already checked this
-            // ticket in elsewhere while this phone was offline - flag it so staff
-            // can double-check that guest rather than silently ignoring it.
-            flagConflict(ticketId, result.usedAt);
-          }
-        }
-        if (pendingQueue.length === 0) {
-          pendingSync = false;
-          if (syncTimer) {
-            clearInterval(syncTimer);
-            syncTimer = null;
-          }
-        }
-        saveScanCache(); // keep the persisted queue in step with what has synced
-        renderSyncNote();
-      }
-
-      const conflicts = [];
-      function flagConflict(ticketId, usedAt) {
-        const t = localTickets.find((x) => x.id === ticketId);
-        conflicts.push({ num: t ? t.num : "?", usedAt });
-        renderSyncNote();
+        // status === 'offline': we cannot reach the database, so we CANNOT verify
+        // this ticket. We never guess - staff fall back to the printed backup list.
+        const sub = result.reason === "auth" ? t("cant_verify_auth") : t("cant_verify_sub");
+        showResult(false, t("cant_verify"), sub);
       }
 
       function bumpLocalCount() {
@@ -1550,26 +1413,6 @@
         }
         const used = tickets.filter((x) => x.used).length;
         statsEl.innerHTML = t("stats_line", used, tickets.length - used, tickets.length);
-      }
-
-      function renderSyncNote() {
-        const el = document.getElementById("sync-note");
-        if (!el) return;
-        if (authIssue) {
-          el.style.color = "var(--stamp-red)";
-          el.innerHTML = t("auth_problem", pendingQueue.length);
-          return;
-        }
-        el.style.color = "#8a8272";
-        let msg = "";
-        if (pendingSync) {
-          msg = t("offline_saving", pendingQueue.length);
-        }
-        if (conflicts.length) {
-          const list = conflicts.map((c) => "#" + String(c.num).padStart(3, "0")).join(", ");
-          msg += (msg ? " " : "") + t("conflict_note", conflicts.length, list);
-        }
-        el.textContent = msg;
       }
 
       function showResult(valid, title, sub) {

@@ -25,9 +25,11 @@ a copied ticket through twice.
   **exactly once**, enforced by a database transaction (safe with multiple
   scanners at the same door).
 - 📴 **Emergency mode** - the printed tickets and a downloadable checklist work
-  with **no app and no internet at all**. If the network drops mid-event, scanning
-  keeps working offline and syncs when it returns; queued check-ins even survive a
-  tab reload.
+  with **no app and no internet at all**. Verdicts are **online-only**: a ticket
+  is declared valid/used only by the shared database, so duplicates are caught in
+  real time on every device. With no connection the app never guesses - it says
+  "can't verify, use the paper list," and the printed checklist is the outage
+  procedure.
 - 🔒 **Server-enforced security** - every read/write requires a signed-in staff
   account, enforced by Firestore rules, not just the UI.
 - 🧰 **No build step** - one `index.html`, hosted free on GitHub Pages.

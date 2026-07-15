@@ -93,9 +93,11 @@ Yes, given the above. The site is static and public, but that's fine because:
   the bar so a fake can't be fabricated _without_ seeing a real one.
 - **Shared staff role.** Any signed-in staff account can generate and scan; there
   are no per-role restrictions. Appropriate for a small trusted team.
-- **Offline honor-window.** If the network is down at the door, scanning falls
-  back to a locally cached list; two offline phones could each accept the same
-  ticket, which is then flagged for staff to recheck when they reconnect.
+- **No offline verdicts (by design).** Verdicts are online-only: the app only
+  declares a ticket valid/used when it can reach the database, guaranteeing the
+  exactly-once property with no chance of two devices disagreeing. With no
+  connection it does not guess - it shows "can't verify, use the paper list," and
+  the printed backup checklist is the outage procedure.
 - **No extra rate-limiting** beyond Firebase's own defaults.
 
 ## Keeping it secure over time

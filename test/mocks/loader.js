@@ -26,30 +26,25 @@ const SHIM = `
 ;window.__t = {
   get STORAGE_MODE(){ return STORAGE_MODE }, set STORAGE_MODE(v){ STORAGE_MODE = v },
   get firebaseReady(){ return firebaseReady },
-  get pendingQueue(){ return pendingQueue },
-  get conflicts(){ return conflicts },
   get reuseAttempts(){ return reuseAttempts },
   recordReuseAttempt, renderAttemptsList, loadAttempts,
   get localTickets(){ return localTickets }, set localTickets(v){ localTickets = v },
   get currentEventId(){ return currentEventId }, set currentEventId(v){ currentEventId = v },
-  get authIssue(){ return authIssue },
-  get pendingSync(){ return pendingSync },
   get lastDecodeTime(){ return (typeof lastDecodeTime!=='undefined')?lastDecodeTime:null },
   get CODE_ALPHABET(){ return CODE_ALPHABET },
   get LANG(){ return LANG },
   setLang, applyStaticI18n, t,
-  tryCheckIn, processCheckIn, handleScan, retrySync,
+  tryCheckIn, processCheckIn, handleScan,
   getTickets, createTickets, deleteEvent, getEvents, saveEvents,
   genShortCode, escapeHtml, uid, downloadBackupList,
   renderScanPanel, renderGeneratePanel, startScanning, stopScanning,
   storageTest, updateStats, initFirebase,
-  // test-only teardown: kill the RAF/sync timers WITHOUT the async re-render
-  // that stopScanning() triggers (which would touch a closed window).
+  // test-only teardown: kill the RAF/ticket-refresh timers WITHOUT the async
+  // re-render that stopScanning() triggers (which would touch a closed window).
   _stopTimers(){
     try{ if(scanRAF) cancelAnimationFrame(scanRAF); }catch(e){}
     try{ if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); } }catch(e){}
     scanStream = null;
-    try{ if(syncTimer){ clearInterval(syncTimer); syncTimer = null; } }catch(e){}
     try{ stopTicketRefresh(); }catch(e){}
   }
 };

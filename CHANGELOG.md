@@ -6,6 +6,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Online-only verdicts (safety).** A ticket is now declared valid/used ONLY by
+  the shared database. Removed offline check-in and its per-device cache/queue:
+  with no connection the scanner shows "can't verify - use the paper list" and
+  changes nothing. This makes the exactly-once guarantee absolute and removes any
+  chance of the scanner and the event view disagreeing. The printed backup
+  checklist remains the outage procedure.
+
 ### Added
 
 - **Repeat-attempt log** on the Scan tab (per device, per event): a glance-able
