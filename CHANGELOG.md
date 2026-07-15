@@ -45,6 +45,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Firestore free-tier read usage.** The event view polled the database every 5s
+  and the scan stats re-queried on every check-in, which could exhaust the free
+  daily read quota (making the app show "can't verify"). The event view now
+  refreshes every 30s and pauses while the tab is hidden (plus the manual Refresh
+  button), and scan counts are tracked locally between the one scan-start read.
 - Corrected the jsQR library URL - the previous cdnjs path returned 404, which
   broke the door scanner ("jsQR is not defined"). Now loaded from jsDelivr.
 - (Superseded by the online-only change above) A stale per-device cache could

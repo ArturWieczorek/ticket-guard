@@ -1040,9 +1040,15 @@
         drawTicketGrid(ev, tickets);
 
         // Keep this view current while it's open: the grid is a snapshot, so
-        // poll for check-ins and update the marks/counts in place (no QR redraw).
+        // occasionally refresh the marks/counts in place (no QR redraw). Kept
+        // infrequent, and paused when the tab isn't visible, to stay well within
+        // Firestore's free-tier read quota - use the Refresh button for an
+        // instant update.
         stopTicketRefresh();
-        ticketRefreshTimer = setInterval(() => refreshTicketStates(ev, tickets), 5000);
+        ticketRefreshTimer = setInterval(() => {
+          // Pause the automatic poll when the tab isn't visible (saves DB reads).
+          if (!document.hidden) refreshTicketStates(ev, tickets);
+        }, 30000);
       }
 
       let ticketRefreshTimer = null;
@@ -1293,7 +1299,10 @@
           if (startBtn) startBtn.disabled = false; // let them retry
           area.innerHTML = `<div class="result-banner invalid" style="display:block;">${t("camera_unavailable")}<div class="sub">${escapeHtml(e.message || t("camera_denied"))}</div></div>`;
         }
-        updateStats();
+        // Seed the counters from the list already loaded (no extra DB read).
+        scanTotal = (localTickets || []).length;
+        scanCheckedIn = (localTickets || []).filter((x) => x.used).length;
+        renderScanStats();
       }
 
       function haltCamera() {
@@ -1396,16 +1405,27 @@
         showResult(false, t("cant_verify"), sub);
       }
 
-      function bumpLocalCount() {
-        updateStats(); // fire-and-forget refresh; doesn't block the next scan
-      }
-
-      async function updateStats() {
-        if (!currentEventId) return;
+      // Scan-tab counters are kept locally so a busy door does NOT re-read the
+      // whole ticket list from the database on every single scan (that would
+      // burn through Firestore's free-tier read quota). The full count is fetched
+      // once at scan-start; each accepted check-in just increments it.
+      let scanTotal = 0;
+      let scanCheckedIn = 0;
+      function renderScanStats() {
         const statsEl = document.getElementById("scan-stats");
         if (!statsEl) return;
-        // Prefer a fresh live count; fall back to the local cache if offline.
-        let tickets = localTickets;
+        statsEl.innerHTML = t("stats_line", scanCheckedIn, Math.max(0, scanTotal - scanCheckedIn), scanTotal);
+      }
+      function bumpLocalCount() {
+        scanCheckedIn++; // one accepted check-in; no database read
+        renderScanStats();
+      }
+
+      // One DB read to seed the counts (scan-start, or a manual refresh).
+      async function updateStats() {
+        if (!currentEventId) return;
+        if (!document.getElementById("scan-stats")) return;
+        let tickets = localTickets || [];
         if (STORAGE_MODE === "firebase") {
           try {
             tickets = await getTickets(currentEventId);
@@ -1413,8 +1433,9 @@
             /* keep local */
           }
         }
-        const used = tickets.filter((x) => x.used).length;
-        statsEl.innerHTML = t("stats_line", used, tickets.length - used, tickets.length);
+        scanTotal = tickets.length;
+        scanCheckedIn = tickets.filter((x) => x.used).length;
+        renderScanStats();
       }
 
       function showResult(valid, title, sub) {
