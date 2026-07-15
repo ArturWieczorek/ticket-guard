@@ -1,6 +1,6 @@
 # TicketGuard
 
-[![CI](https://github.com/<your-username>/<repo>/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-username>/<repo>/actions/workflows/ci.yml)
+[![CI](https://github.com/ArturWieczorek/ticket-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/ArturWieczorek/ticket-guard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](./LICENSE)
 
 Print and validate anti-counterfeiting **QR tickets for library events** - with a

@@ -50,5 +50,5 @@ First professional, tested release.
 - `downloadBackupList` no longer sorts its input array in place.
 - Event-name input is length-capped.
 
-[Unreleased]: https://github.com/<your-username>/<repo>/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/<your-username>/<repo>/releases/tag/v1.0.0
+[Unreleased]: https://github.com/ArturWieczorek/ticket-guard/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ArturWieczorek/ticket-guard/releases/tag/v1.0.0
