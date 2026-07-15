@@ -27,6 +27,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A test (`test/cdn-links.test.js`) that fetches every `<script src>` CDN URL in
   `index.html` and fails if any is unreachable, so a dead link can't regress
   again. (The other tests mock these libraries and can't catch a bad URL.)
+- **`docs/DOOR-PROCEDURE.md`**: a printable one-pager (PL/EN) telling staff what
+  each scanner result means and what to do (admit / do not admit / use paper).
 
 ### Changed
 
@@ -38,6 +40,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   checklist remains the outage procedure.
 - The "Start camera" button is disabled (greyed) while a scan session is running;
   the "Stop camera" button ends it. Prevents starting twice.
+- The "already used" banner now spells out the action ("Do not admit on this
+  ticket" / "Nie wpuszczaj na ten bilet") alongside the first check-in time.
 
 ### Fixed
 

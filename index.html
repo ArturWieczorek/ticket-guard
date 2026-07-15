@@ -501,6 +501,7 @@
           checked_in_num: (n) => `Bilet ${n} odprawiony.`,
           already_used: "JUŻ WYKORZYSTANY",
           checked_at: (when) => `Odprawiony o ${when}. Możliwy duplikat.`,
+          do_not_admit: "Nie wpuszczaj na ten bilet.",
           unknown_ticket: "Nieznany bilet",
           unknown_ticket_sub: "Ten kod nie pasuje do żadnego biletu - prawdopodobnie fałszywy.",
           not_ticketguard: "To nie jest kod TicketGuard",
@@ -588,6 +589,7 @@
           checked_in_num: (n) => `Ticket ${n} checked in.`,
           already_used: "ALREADY USED",
           checked_at: (when) => `Checked in at ${when}. Possible duplicate.`,
+          do_not_admit: "Do not admit on this ticket.",
           unknown_ticket: "Unknown ticket",
           unknown_ticket_sub: "This code doesn't match any ticket on file - likely a fake.",
           not_ticketguard: "Not a TicketGuard code",
@@ -1378,7 +1380,7 @@
         }
         if (result.status === "used") {
           const when = result.usedAt ? new Date(result.usedAt).toLocaleTimeString() : "earlier";
-          showResult(false, t("already_used"), t("checked_at", when));
+          showResult(false, t("already_used"), t("checked_at", when) + " " + t("do_not_admit"));
           const lt = localTickets && localTickets.find((x) => x.id === ticketId);
           recordReuseAttempt(ticketId, result.num != null ? result.num : lt && lt.num, lt && lt.shortCode);
           return;

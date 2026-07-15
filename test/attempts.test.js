@@ -25,6 +25,11 @@ test('scanning an already-used ticket again logs a repeat attempt', async () => 
   const panel = app.window.document.getElementById('attempts-panel');
   assert.notStrictEqual(panel.style.display, 'none', 'panel is visible');
   assert.match(panel.textContent, /001/, 'shows the ticket number');
+
+  // the banner tells staff exactly what to do
+  const banner = app.window.document.getElementById('result-banner').textContent;
+  assert.match(banner, /ALREADY USED/i);
+  assert.match(banner, /Do not admit/i, 'banner spells out the action');
   app.close();
 });
 

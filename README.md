@@ -93,6 +93,7 @@ happy paths. See [CONTRIBUTING.md](./CONTRIBUTING.md) and, for AI agents,
 ## Documentation
 
 - [docs/SETUP.md](docs/SETUP.md) - Firebase + GitHub Pages, step by step.
+- [docs/DOOR-PROCEDURE.md](docs/DOOR-PROCEDURE.md) - printable one-pager for staff at the door (PL/EN).
 - [SECURITY.md](./SECURITY.md) - threat model, hardening, how to report issues.
 - [docs/DESIGN.md](docs/DESIGN.md) - architecture and the reasoning behind it.
 - [CHANGELOG.md](./CHANGELOG.md) - notable changes.
