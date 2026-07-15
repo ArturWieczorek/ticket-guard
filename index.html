@@ -864,7 +864,6 @@
       document.querySelectorAll(".tab").forEach((t) => {
         t.addEventListener("click", () => {
           haltCamera(); // always release the camera before switching views, whichever tab was active
-          stopTicketRefresh(); // and stop the tickets-view poll
           document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
           t.classList.add("active");
           const tab = t.dataset.tab;
@@ -876,7 +875,6 @@
 
       // ================= GENERATE PANEL =================
       async function renderGeneratePanel() {
-        stopTicketRefresh(); // the tickets view (and its poll) is about to be replaced
         const el = document.getElementById("panel-generate");
         const events = await getEvents();
 
@@ -1038,33 +1036,15 @@
         };
         document.getElementById("btn-refresh-tickets").onclick = () => refreshTicketStates(ev, tickets);
         drawTicketGrid(ev, tickets);
-
-        // Keep this view current while it's open: the grid is a snapshot, so
-        // occasionally refresh the marks/counts in place (no QR redraw). Kept
-        // infrequent, and paused when the tab isn't visible, to stay well within
-        // Firestore's free-tier read quota - use the Refresh button for an
-        // instant update.
-        stopTicketRefresh();
-        ticketRefreshTimer = setInterval(() => {
-          // Pause the automatic poll when the tab isn't visible (saves DB reads).
-          if (!document.hidden) refreshTicketStates(ev, tickets);
-        }, 30000);
+        // The grid is a snapshot. It updates ONLY when the user clicks Refresh -
+        // no background polling - so leaving this view open costs zero database
+        // reads (important for the Firestore free tier).
       }
 
-      let ticketRefreshTimer = null;
-      function stopTicketRefresh() {
-        if (ticketRefreshTimer) {
-          clearInterval(ticketRefreshTimer);
-          ticketRefreshTimer = null;
-        }
-      }
       // Update used-marks and counts from the live data without redrawing QR codes.
       async function refreshTicketStates(ev, tickets) {
         const grid = document.getElementById("ticket-grid");
-        if (!grid) {
-          stopTicketRefresh();
-          return;
-        }
+        if (!grid) return;
         let fresh;
         try {
           fresh = await getTickets(ev.id);

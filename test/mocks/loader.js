@@ -45,7 +45,6 @@ const SHIM = `
     try{ if(scanRAF) cancelAnimationFrame(scanRAF); }catch(e){}
     try{ if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); } }catch(e){}
     scanStream = null;
-    try{ stopTicketRefresh(); }catch(e){}
   }
 };
 `;
