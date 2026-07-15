@@ -11,17 +11,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Delete event**: a Delete button on each event in the Generate tab (with a
   confirmation) removes the event and all of its ticket documents, and clears its
   offline cache.
+- A test (`test/cdn-links.test.js`) that fetches every `<script src>` CDN URL in
+  `index.html` and fails if any is unreachable, so a dead link can't regress
+  again. (The other tests mock these libraries and can't catch a bad URL.)
 
 ### Fixed
 
 - Corrected the jsQR library URL - the previous cdnjs path returned 404, which
   broke the door scanner ("jsQR is not defined"). Now loaded from jsDelivr.
-
-### Added
-
-- A test (`test/cdn-links.test.js`) that fetches every `<script src>` CDN URL in
-  `index.html` and fails if any is unreachable, so a dead link can't regress
-  again. (The other tests mock these libraries and can't catch a bad URL.)
 
 ## [1.0.0] - 2026-07-15
 
