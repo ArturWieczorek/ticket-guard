@@ -486,6 +486,8 @@
           choose_event: "Wybierz wydarzenie...",
           start_camera: "Uruchom kamerę",
           stop_camera: "Zatrzymaj kamerę",
+          attempts_title: "Powtórne próby wejścia",
+          attempts_entry: (num, code, count, when) => `#${num} (kod ${code}) - ${count}x, ostatnio ${when}`,
           no_events_scan: "Brak wydarzeń - najpierw utwórz jedno w zakładce Generuj.",
           pick_event_first: "Najpierw wybierz wydarzenie",
           camera_unavailable: "Kamera niedostępna",
@@ -568,6 +570,8 @@
           choose_event: "Choose an event...",
           start_camera: "Start camera",
           stop_camera: "Stop camera",
+          attempts_title: "Repeat entry attempts",
+          attempts_entry: (num, code, count, when) => `#${num} (code ${code}) - ${count}x, last ${when}`,
           no_events_scan: "No events yet - create one in the Generate tab first.",
           pick_event_first: "Pick an event first",
           camera_unavailable: "Camera unavailable",
@@ -1138,6 +1142,74 @@
       let syncTimer = null;
       let authIssue = false; // true if failures look like a sign-in/permissions problem, not a real outage
 
+      // ---------- repeat-attempt log (per device, per event) ----------
+      // A glance-able history of tickets that were scanned again AFTER already
+      // being used. This does not affect entry (the red "already used" banner
+      // already blocks that on every device) - it is just a local record for the
+      // librarian at this device. Persisted per event so it survives a reload.
+      let reuseAttempts = [];
+      function attemptsKey(eventId) {
+        return "tg_attempts_" + eventId;
+      }
+      function loadAttempts(eventId) {
+        try {
+          const raw = localStorage.getItem(attemptsKey(eventId));
+          const list = raw ? JSON.parse(raw) : [];
+          return Array.isArray(list) ? list : [];
+        } catch (e) {
+          return [];
+        }
+      }
+      function saveAttempts() {
+        if (!currentEventId) return;
+        try {
+          localStorage.setItem(attemptsKey(currentEventId), JSON.stringify(reuseAttempts));
+        } catch (e) {
+          /* non-fatal */
+        }
+      }
+      function recordReuseAttempt(id, num, code) {
+        const now = Date.now();
+        const existing = reuseAttempts.find((a) => a.id === id);
+        if (existing) {
+          // Ignore the same ticket held in front of the camera (decoded repeatedly).
+          if (now - existing.lastTs < 5000) return;
+          existing.count++;
+          existing.lastTs = now;
+          reuseAttempts = [existing, ...reuseAttempts.filter((a) => a.id !== id)];
+        } else {
+          reuseAttempts.unshift({ id, num: num == null ? "?" : num, code: code || "", count: 1, lastTs: now });
+        }
+        saveAttempts();
+        renderAttemptsList();
+      }
+      function renderAttemptsList() {
+        const el = document.getElementById("attempts-panel");
+        if (!el) return;
+        if (!reuseAttempts.length) {
+          el.style.display = "none";
+          el.innerHTML = "";
+          return;
+        }
+        el.style.display = "block";
+        el.innerHTML =
+          `<div style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#8a8272;margin-bottom:6px;">${t("attempts_title")}</div>` +
+          reuseAttempts
+            .map(
+              (a) =>
+                `<div style="font-size:13px;color:var(--stamp-red);padding:2px 0;">${escapeHtml(
+                  t(
+                    "attempts_entry",
+                    String(a.num).padStart(3, "0"),
+                    a.code || "?????",
+                    a.count,
+                    new Date(a.lastTs).toLocaleTimeString(),
+                  ),
+                )}</div>`,
+            )
+            .join("");
+      }
+
       // ---------- offline cache (localStorage) ----------
       // Persist the loaded ticket list AND any not-yet-synced check-ins for an event,
       // so a scanner can (a) COLD-START with no network at all from the last cached
@@ -1209,6 +1281,9 @@
         conflicts.length = 0;
         pendingSync = false;
         authIssue = false;
+        // Load this device's repeat-attempt history for the event (accumulates
+        // across stop/start and reloads).
+        reuseAttempts = loadAttempts(currentEventId);
 
         const area = document.getElementById("scan-area");
         area.innerHTML = `
@@ -1219,11 +1294,13 @@
     <div class="result-banner" id="result-banner"></div>
     <div id="sync-note" style="text-align:center;font-size:12px;color:#8a8272;margin-top:8px;"></div>
     <div class="stats" id="scan-stats" style="justify-content:center;"></div>
+    <div id="attempts-panel" class="no-print" style="max-width:420px;margin:14px auto 0;display:none;"></div>
     <div style="text-align:center;margin-top:14px;">
       <button class="btn-secondary" id="btn-stop-scan">${t("stop_camera")}</button>
     </div>
   `;
         document.getElementById("btn-stop-scan").onclick = stopScanning;
+        renderAttemptsList();
 
         // Load the ticket list ONCE. From here on, scanning works off this local
         // copy so a dropped connection mid-event doesn't stop check-ins - it just
@@ -1362,6 +1439,8 @@
         if (result.status === "used") {
           const when = result.usedAt ? new Date(result.usedAt).toLocaleTimeString() : "earlier";
           showResult(false, t("already_used"), t("checked_at", when));
+          const lt = localTickets && localTickets.find((x) => x.id === ticketId);
+          recordReuseAttempt(ticketId, result.num != null ? result.num : lt && lt.num, lt && lt.shortCode);
           return;
         }
         if (result.status === "unknown") {
@@ -1382,6 +1461,7 @@
         if (ticket.used) {
           const when = new Date(ticket.usedAt).toLocaleTimeString();
           showResult(false, t("already_used_offline"), t("marked_used_at", when));
+          recordReuseAttempt(ticketId, ticket.num, ticket.shortCode);
           return;
         }
         ticket.used = true;

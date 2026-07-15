@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Repeat-attempt log** on the Scan tab (per device, per event): a glance-able
+  list of tickets scanned again after already being used (number, code, count,
+  last time), newest first, persisted across reloads. It does not affect entry -
+  the real-time "already used" banner still blocks duplicates on every device -
+  it is purely a local record.
+
 - **Used-ticket marking in the event view**: checked-in tickets are dimmed with a
   red border and a "Used" stamp. The view auto-refreshes every few seconds (and
   has a Refresh button), updating the marks and counts in place without redrawing

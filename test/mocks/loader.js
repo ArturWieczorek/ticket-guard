@@ -28,6 +28,8 @@ const SHIM = `
   get firebaseReady(){ return firebaseReady },
   get pendingQueue(){ return pendingQueue },
   get conflicts(){ return conflicts },
+  get reuseAttempts(){ return reuseAttempts },
+  recordReuseAttempt, renderAttemptsList, loadAttempts,
   get localTickets(){ return localTickets }, set localTickets(v){ localTickets = v },
   get currentEventId(){ return currentEventId }, set currentEventId(v){ currentEventId = v },
   get authIssue(){ return authIssue },
