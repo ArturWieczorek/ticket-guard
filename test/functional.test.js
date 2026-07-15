@@ -84,6 +84,48 @@ test("backup list generation does not mutate the caller's ticket array order", a
   app.close();
 });
 
+test('deleteEvent removes the event and all its tickets, leaving others intact', async () => {
+  const { backend, app } = await bootApp();
+  const { eventId } = await seedEvent(app, 'Temp Test Event', 4);
+  const keep = await seedEvent(app, 'Real Event', 2);
+
+  await app.__t.deleteEvent(eventId);
+
+  const events = await app.__t.getEvents();
+  assert.ok(!events.some((e) => e.id === eventId), 'deleted event is gone from the index');
+  assert.ok(
+    events.some((e) => e.id === keep.eventId),
+    'other event is untouched',
+  );
+  assert.strictEqual((await app.__t.getTickets(eventId)).length, 0, 'its tickets are deleted');
+  assert.strictEqual((await app.__t.getTickets(keep.eventId)).length, 2, 'other tickets remain');
+  // and nothing for the deleted event lingers in the backend
+  const remaining = Object.values(backend.dump('ticketguard_tickets')).filter(
+    (t) => t.eventId === eventId,
+  );
+  assert.strictEqual(remaining.length, 0);
+  app.close();
+});
+
+test('the Delete button in the event list removes that event', async () => {
+  const { app } = await bootApp();
+  const { eventId } = await seedEvent(app, 'Click To Delete', 3);
+  await app.__t.renderGeneratePanel();
+
+  const btn = app.window.document.querySelector(`.btn-delete-event[data-id="${eventId}"]`);
+  assert.ok(btn, 'a delete button is rendered for the event');
+  // real click (handler is on addEventListener); window.confirm is stubbed true
+  btn.dispatchEvent(new app.window.MouseEvent('click', { bubbles: true }));
+  // the handler is async; wait until the event is gone
+  let gone = false;
+  for (let i = 0; i < 50 && !gone; i++) {
+    await tick(app.window, 5);
+    gone = !(await app.__t.getEvents()).some((e) => e.id === eventId);
+  }
+  assert.ok(gone, 'event removed via the button');
+  app.close();
+});
+
 test('live stats reflect check-ins', async () => {
   const { app } = await bootApp();
   const { eventId, tickets } = await seedEvent(app, 'Stats Event', 5);

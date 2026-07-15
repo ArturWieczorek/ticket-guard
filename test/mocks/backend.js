@@ -69,6 +69,25 @@ function createBackend() {
       }
     },
 
+    // A batch of mixed set/delete ops applied atomically.
+    applyBatch(ops) {
+      guardFirestore();
+      for (const o of ops) {
+        const c = col(o.col);
+        if (o.type === 'delete') {
+          c.delete(o.id);
+        } else {
+          const prev = c.get(o.id);
+          c.set(o.id, { data: { ...o.data }, version: (prev ? prev.version : 0) + 1 });
+        }
+      }
+    },
+
+    deleteDoc(colName, id) {
+      guardFirestore();
+      col(colName).delete(id);
+    },
+
     query(colName, field, value) {
       guardFirestore();
       const out = [];

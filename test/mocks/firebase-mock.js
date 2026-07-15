@@ -21,6 +21,9 @@ function makeFirebase(backend) {
       async set(data) {
         backend.setDoc(colName, id, data);
       },
+      async delete() {
+        backend.deleteDoc(colName, id);
+      },
     };
   }
 
@@ -53,13 +56,16 @@ function makeFirebase(backend) {
       return collectionRef(name);
     },
     batch() {
-      const writes = [];
+      const ops = [];
       return {
         set(ref, data) {
-          writes.push({ col: ref.__col, id: ref.__id, data });
+          ops.push({ type: 'set', col: ref.__col, id: ref.__id, data });
+        },
+        delete(ref) {
+          ops.push({ type: 'delete', col: ref.__col, id: ref.__id });
         },
         async commit() {
-          backend.batchSet(writes);
+          backend.applyBatch(ops);
         },
       };
     },

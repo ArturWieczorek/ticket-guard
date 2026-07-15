@@ -35,7 +35,7 @@ const SHIM = `
   get lastDecodeTime(){ return (typeof lastDecodeTime!=='undefined')?lastDecodeTime:null },
   get CODE_ALPHABET(){ return CODE_ALPHABET },
   tryCheckIn, processCheckIn, handleScan, retrySync,
-  getTickets, createTickets, getEvents, saveEvents,
+  getTickets, createTickets, deleteEvent, getEvents, saveEvents,
   genShortCode, escapeHtml, uid, downloadBackupList,
   renderScanPanel, renderGeneratePanel, startScanning, stopScanning,
   storageTest, updateStats, initFirebase,
@@ -131,6 +131,8 @@ async function loadApp(backend, opts = {}) {
       window.URL.revokeObjectURL = () => {};
       // --- keep window.print() from throwing ---
       window.print = () => {};
+      // --- confirm() defaults to true in tests (delete flows use it) ---
+      window.confirm = () => true;
       // --- seed localStorage to simulate a page reload carrying prior state ---
       if (opts.seedStorage) {
         for (const [k, v] of Object.entries(opts.seedStorage)) {

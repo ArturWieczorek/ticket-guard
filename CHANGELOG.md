@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Delete event**: a Delete button on each event in the Generate tab (with a
+  confirmation) removes the event and all of its ticket documents, and clears its
+  offline cache.
+
 ### Fixed
 
 - Corrected the jsQR library URL - the previous cdnjs path returned 404, which

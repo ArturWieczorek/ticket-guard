@@ -525,6 +525,27 @@
           .sort((a, b) => a.num - b.num);
       }
 
+      // Delete an event and all of its ticket documents, plus any offline cache.
+      async function deleteEvent(eventId) {
+        const tickets = await getTickets(eventId);
+        if (STORAGE_MODE === "firebase") {
+          const batch = db.batch();
+          tickets.forEach((t) => batch.delete(db.collection("ticketguard_tickets").doc(t.id)));
+          await batch.commit();
+        } else {
+          tickets.forEach((t) => {
+            delete memoryStore["ticket:" + t.id];
+          });
+        }
+        const events = (await getEvents()).filter((e) => e.id !== eventId);
+        await saveEvents(events);
+        try {
+          localStorage.removeItem("tg_scan_" + eventId);
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
       // Atomic "mark this one ticket used, only if it isn't already" - safe even
       // if two phones scan two different tickets, or (rarer) the same ticket, in
       // the same instant. Returns one of: ok / used / unknown / offline.
@@ -662,7 +683,11 @@
             <div style="font-weight:600;">${escapeHtml(ev.name)}</div>
             <div class="meta">${ev.count} tickets · created ${new Date(ev.createdAt).toLocaleDateString()}</div>
           </div>
-          <div class="meta">View →</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="meta">View →</span>
+            <button class="btn-delete-event" data-id="${ev.id}" title="Delete this event"
+              style="background:transparent;border:1.5px solid var(--stamp-red);color:var(--stamp-red);padding:6px 10px;font-size:13px;">Delete</button>
+          </div>
         </div>
       `,
               )
@@ -672,6 +697,20 @@
               const ev = events.find((e) => e.id === row.dataset.id);
               const tickets = await getTickets(ev.id);
               renderTicketsForPrint(ev, tickets);
+            });
+          });
+          listEl.querySelectorAll(".btn-delete-event").forEach((btn) => {
+            btn.addEventListener("click", async (e) => {
+              e.stopPropagation(); // don't also open the event's ticket view
+              const ev = events.find((x) => x.id === btn.dataset.id);
+              if (!ev) return;
+              if (!confirm(`Delete "${ev.name}" and its ${ev.count} tickets? This cannot be undone.`)) return;
+              btn.disabled = true;
+              btn.textContent = "Deleting...";
+              await deleteEvent(ev.id);
+              const out = document.getElementById("tickets-output");
+              if (out) out.innerHTML = "";
+              renderGeneratePanel();
             });
           });
         }
