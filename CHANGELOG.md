@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Used-ticket marking in the event view**: checked-in tickets are dimmed with a
+  red border and a "Used" stamp. The view auto-refreshes every few seconds (and
+  has a Refresh button), updating the marks and counts in place without redrawing
+  the QR codes - so a monitor showing the tickets stays current as people are
+  scanned in.
 - **Polish / English language support**: the interface defaults to Polish, with
   a language toggle in the top bar; the choice is remembered per browser. Covers
   all visible labels and messages (Firebase's own error strings are passed

@@ -225,6 +225,27 @@
         color: var(--ink);
         font-weight: 600;
       }
+      .ticket.used {
+        opacity: 0.5;
+        border-color: var(--stamp-red);
+      }
+      .ticket .used-stamp {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-16deg);
+        border: 3px solid var(--stamp-red);
+        color: var(--stamp-red);
+        font-family: "Fraunces", Georgia, serif;
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 2px 10px;
+        border-radius: 4px;
+        opacity: 0.9;
+        pointer-events: none;
+      }
       .scan-stage {
         position: relative;
         width: 100%;
@@ -450,6 +471,8 @@
           to_num: "Do nr",
           print_range: "Drukuj ten zakres",
           print_all: "Drukuj wszystkie",
+          refresh: "Odśwież",
+          used_stamp: "Wykorzystany",
           batch_hint:
             "Wydajesz bilety, gdy ludzie zapisują się przy biurku? Drukuj po małej partii (np. bilety 1-10) zamiast całości - dopisz imię osoby, jeśli chcesz wiedzieć, kto ma który.",
           backup_btn: "Pobierz awaryjną listę zapasową",
@@ -530,6 +553,8 @@
           to_num: "To #",
           print_range: "Print this range",
           print_all: "Print all",
+          refresh: "Refresh",
+          used_stamp: "Used",
           batch_hint:
             "Handing tickets out as people register at the desk? Print a small batch at a time (e.g. tickets 1-10) instead of the whole run - write the person's name on it if you want a record of who has which one.",
           backup_btn: "Download emergency backup list",
@@ -826,6 +851,7 @@
       document.querySelectorAll(".tab").forEach((t) => {
         t.addEventListener("click", () => {
           haltCamera(); // always release the camera before switching views, whichever tab was active
+          stopTicketRefresh(); // and stop the tickets-view poll
           document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
           t.classList.add("active");
           const tab = t.dataset.tab;
@@ -837,6 +863,7 @@
 
       // ================= GENERATE PANEL =================
       async function renderGeneratePanel() {
+        stopTicketRefresh(); // the tickets view (and its poll) is about to be replaced
         const el = document.getElementById("panel-generate");
         const events = await getEvents();
 
@@ -958,9 +985,10 @@
     <div class="card no-print">
       <h3>${escapeHtml(ev.name)}</h3>
       <div class="stats">
-        <span><b>${tickets.length}</b> ${t("total")}</span>
-        <span><b>${usedCount}</b> ${t("checked_in")}</span>
-        <span><b>${tickets.length - usedCount}</b> ${t("remaining")}</span>
+        <span><b id="stat-total">${tickets.length}</b> ${t("total")}</span>
+        <span><b id="stat-used">${usedCount}</b> ${t("checked_in")}</span>
+        <span><b id="stat-remaining">${tickets.length - usedCount}</b> ${t("remaining")}</span>
+        <button class="btn-secondary" id="btn-refresh-tickets" style="margin-left:auto;padding:6px 12px;font-size:13px;">${t("refresh")}</button>
       </div>
       <div style="margin-top:14px;display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
         <div>
@@ -995,7 +1023,68 @@
           drawTicketGrid(ev, subset);
           window.print();
         };
+        document.getElementById("btn-refresh-tickets").onclick = () => refreshTicketStates(ev, tickets);
         drawTicketGrid(ev, tickets);
+
+        // Keep this view current while it's open: the grid is a snapshot, so
+        // poll for check-ins and update the marks/counts in place (no QR redraw).
+        stopTicketRefresh();
+        ticketRefreshTimer = setInterval(() => refreshTicketStates(ev, tickets), 5000);
+      }
+
+      let ticketRefreshTimer = null;
+      function stopTicketRefresh() {
+        if (ticketRefreshTimer) {
+          clearInterval(ticketRefreshTimer);
+          ticketRefreshTimer = null;
+        }
+      }
+      // Update used-marks and counts from the live data without redrawing QR codes.
+      async function refreshTicketStates(ev, tickets) {
+        const grid = document.getElementById("ticket-grid");
+        if (!grid) {
+          stopTicketRefresh();
+          return;
+        }
+        let fresh;
+        try {
+          fresh = await getTickets(ev.id);
+        } catch (e) {
+          return; // transient; try again on the next tick
+        }
+        const byId = new Map(fresh.map((x) => [x.id, x]));
+        // reflect into the snapshot so a subsequent print is accurate too
+        if (Array.isArray(tickets)) {
+          tickets.forEach((tk) => {
+            const f = byId.get(tk.id);
+            if (f) {
+              tk.used = f.used;
+              tk.usedAt = f.usedAt;
+            }
+          });
+        }
+        grid.querySelectorAll(".ticket").forEach((card) => {
+          const f = byId.get(card.dataset.id);
+          const used = f ? !!f.used : false;
+          card.classList.toggle("used", used);
+          let stamp = card.querySelector(".used-stamp");
+          if (used && !stamp) {
+            stamp = document.createElement("div");
+            stamp.className = "used-stamp";
+            stamp.textContent = t("used_stamp");
+            card.appendChild(stamp);
+          } else if (!used && stamp) {
+            stamp.remove();
+          }
+        });
+        const usedCount = fresh.filter((x) => x.used).length;
+        const setNum = (id, n) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = n;
+        };
+        setNum("stat-total", fresh.length);
+        setNum("stat-used", usedCount);
+        setNum("stat-remaining", fresh.length - usedCount);
       }
 
       function drawTicketGrid(ev, tickets) {
@@ -1003,8 +1092,15 @@
         grid.innerHTML = "";
         tickets.forEach((ticket) => {
           const wrap = document.createElement("div");
-          wrap.className = "ticket";
+          wrap.className = "ticket" + (ticket.used ? " used" : "");
+          wrap.dataset.id = ticket.id;
           wrap.innerHTML = `<div class="ticket-label">${t("ticket_no")}</div><div class="num">${String(ticket.num).padStart(3, "0")}</div><div class="code">${ticket.shortCode || ""}</div><div class="qr"></div><div class="event-name">${escapeHtml(ev.name)}</div>`;
+          if (ticket.used) {
+            const stamp = document.createElement("div");
+            stamp.className = "used-stamp";
+            stamp.textContent = t("used_stamp");
+            wrap.appendChild(stamp);
+          }
           grid.appendChild(wrap);
           new QRCode(wrap.querySelector(".qr"), {
             text: JSON.stringify({ e: ev.id, t: ticket.id }),

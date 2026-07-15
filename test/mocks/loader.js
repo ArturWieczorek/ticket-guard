@@ -48,6 +48,7 @@ const SHIM = `
     try{ if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); } }catch(e){}
     scanStream = null;
     try{ if(syncTimer){ clearInterval(syncTimer); syncTimer = null; } }catch(e){}
+    try{ stopTicketRefresh(); }catch(e){}
   }
 };
 `;

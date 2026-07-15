@@ -126,6 +126,48 @@ test('the Delete button in the event list removes that event', async () => {
   app.close();
 });
 
+test('ticket cards render a used state for already-used tickets', async () => {
+  const { app } = await bootApp();
+  const { tickets } = await seedEvent(app, 'Marks', 3);
+  await app.__t.renderGeneratePanel();
+  const ev = (await app.__t.getEvents())[0];
+  // snapshot where the first ticket is already used
+  const snap = tickets.map((tk, i) => ({ ...tk, used: i === 0 }));
+  app.window.renderTicketsForPrint(ev, snap);
+  app.__t._stopTimers(); // stop the auto-poll; we're asserting the static render
+
+  const grid = app.window.document.getElementById('ticket-grid');
+  const used = grid.querySelectorAll('.ticket.used');
+  assert.strictEqual(used.length, 1, 'exactly one card marked used');
+  assert.strictEqual(used[0].dataset.id, tickets[0].id);
+  assert.ok(used[0].querySelector('.used-stamp'), 'a USED stamp is shown on it');
+  app.close();
+});
+
+test('refreshing the tickets view reflects check-ins made elsewhere', async () => {
+  const { app } = await bootApp();
+  const { tickets } = await seedEvent(app, 'Refreshable', 3);
+  await app.__t.renderGeneratePanel();
+  const ev = (await app.__t.getEvents())[0];
+  app.window.renderTicketsForPrint(ev, tickets);
+  app.__t._stopTimers(); // control timing manually
+
+  const grid = app.window.document.getElementById('ticket-grid');
+  assert.strictEqual(grid.querySelectorAll('.ticket.used').length, 0, 'nothing used yet');
+
+  // a phone at the door checks one in
+  await app.__t.tryCheckIn(tickets[0].id);
+  // the monitor view refreshes (button or auto-poll)
+  await app.window.refreshTicketStates(ev, tickets);
+
+  const used = grid.querySelectorAll('.ticket.used');
+  assert.strictEqual(used.length, 1, 'the scanned ticket is now marked used');
+  assert.strictEqual(used[0].dataset.id, tickets[0].id);
+  assert.strictEqual(app.window.document.getElementById('stat-used').textContent, '1');
+  assert.strictEqual(app.window.document.getElementById('stat-remaining').textContent, '2');
+  app.close();
+});
+
 test('live stats reflect check-ins', async () => {
   const { app } = await bootApp();
   const { eventId, tickets } = await seedEvent(app, 'Stats Event', 5);
