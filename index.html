@@ -303,17 +303,34 @@
   <body>
     <div class="topbar">
       <div class="brand">Ticket<span>Guard</span></div>
-      <div id="topbar-right" style="font-size: 12px; opacity: 0.7"></div>
+      <div style="display: flex; align-items: center; gap: 14px">
+        <button
+          id="lang-toggle"
+          title="Change language / Zmien jezyk"
+          style="
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: var(--paper);
+            font-size: 12px;
+            padding: 4px 9px;
+            border-radius: 4px;
+            font-weight: 600;
+          "
+        >
+          EN
+        </button>
+        <div id="topbar-right" style="font-size: 12px; opacity: 0.7"></div>
+      </div>
     </div>
 
     <div id="login-screen" style="max-width: 360px; margin: 60px auto; padding: 0 18px">
       <div class="card">
-        <h3 style="margin-bottom: 14px">Staff sign-in</h3>
-        <label>Email</label>
+        <h3 style="margin-bottom: 14px" data-i18n="login_title">Staff sign-in</h3>
+        <label data-i18n="email">Email</label>
         <input type="text" id="login-email" autocomplete="username" inputmode="email" />
-        <label>Password</label>
+        <label data-i18n="password">Password</label>
         <input type="password" id="login-password" autocomplete="current-password" />
-        <button class="btn-primary" id="btn-login">Sign in</button>
+        <button class="btn-primary" id="btn-login" data-i18n="signin">Sign in</button>
         <div
           id="login-status"
           style="margin-top: 10px; font-size: 13px; min-height: 18px; color: var(--stamp-red)"
@@ -323,8 +340,8 @@
 
     <div id="app-content" style="display: none">
       <div class="tabs no-print">
-        <div class="tab active" data-tab="generate">Generate</div>
-        <div class="tab" data-tab="scan">Scan door</div>
+        <div class="tab active" data-tab="generate" data-i18n="tab_generate">Generate</div>
+        <div class="tab" data-tab="scan" data-i18n="tab_scan">Scan door</div>
       </div>
 
       <div
@@ -385,6 +402,212 @@
       let db = null;
       let firebaseReady = false;
 
+      // ============ LANGUAGE (i18n) ============
+      // Visible labels/actions only. Default Polish; English available via the
+      // toggle in the top bar. The language choice is remembered per browser.
+      // (Firebase's own error messages are passed through as-is.)
+      const I18N = {
+        pl: {
+          signout: "Wyloguj",
+          login_title: "Logowanie personelu",
+          email: "E-mail",
+          password: "Hasło",
+          signin: "Zaloguj się",
+          signin_failed: "Logowanie nie powiodło się.",
+          enter_both: "Podaj e-mail i hasło.",
+          not_configured: "Firebase nie jest jeszcze skonfigurowany - wklej konfigurację na początku pliku.",
+          tab_generate: "Generuj",
+          tab_scan: "Skanuj wejście",
+          storage_memory:
+            "Tryb tylko-ta-sesja - Firebase nie jest połączony albo reguły bezpieczeństwa odrzucają zapisy/odczyty. Bilety utworzone teraz nie będą współdzielone między urządzeniami ani nie przetrwają odświeżenia.",
+          new_event_name: "Nazwa nowego wydarzenia",
+          event_name_ph: "np. Wieczór klubu książki",
+          num_tickets: "Liczba biletów",
+          create_event: "Utwórz wydarzenie i wygeneruj bilety",
+          generating: "Generowanie...",
+          creating_tickets: "Tworzenie biletów...",
+          name_first: "Najpierw podaj nazwę wydarzenia.",
+          done_created: (n) => `Gotowe - utworzono biletów: ${n}.`,
+          could_not_save: (m) => "Nie udało się zapisać: " + m,
+          past_events: "Poprzednie wydarzenia",
+          no_events_gen: "Brak wydarzeń. Utwórz jedno powyżej.",
+          event_meta: (n, d) => `biletów: ${n} · utworzono ${d}`,
+          view: "Zobacz →",
+          delete: "Usuń",
+          deleting: "Usuwanie...",
+          delete_title: "Usuń to wydarzenie",
+          confirm_delete: (name, n) =>
+            `Usunąć wydarzenie "${name}" wraz z biletami (${n})? Tej operacji nie można cofnąć.`,
+          total: "łącznie",
+          checked_in: "odprawionych",
+          remaining: "pozostało",
+          from_num: "Od nr",
+          to_num: "Do nr",
+          print_range: "Drukuj ten zakres",
+          print_all: "Drukuj wszystkie",
+          batch_hint:
+            "Wydajesz bilety, gdy ludzie zapisują się przy biurku? Drukuj po małej partii (np. bilety 1-10) zamiast całości - dopisz imię osoby, jeśli chcesz wiedzieć, kto ma który.",
+          backup_btn: "Pobierz awaryjną listę zapasową",
+          backup_hint:
+            "Zwykła numerowana lista, bez aplikacji i internetu - wydrukuj ją i zabierz do wejścia na wypadek awarii skanera lub sieci. Skreślaj numery ręcznie, gdy ludzie przychodzą.",
+          ticket_no: "Bilet nr",
+          backup_intro: (date, total) =>
+            `Awaryjna lista kontrolna - użyj tylko, gdy skaner lub internet są niedostępne\nSprawdź, czy ZGADZA SIĘ zarówno numer biletu, jak i kod z tym, co wydrukowano na papierowym bilecie, zanim go skreślisz.\nWygenerowano ${date}\nŁącznie biletów: ${total}`,
+          backup_row: (num, code) => `Bilet ${num}   Kod: ${code}   [ ]  odprawiony`,
+          which_event: "Które to wydarzenie?",
+          choose_event: "Wybierz wydarzenie...",
+          start_camera: "Uruchom kamerę",
+          stop_camera: "Zatrzymaj kamerę",
+          no_events_scan: "Brak wydarzeń - najpierw utwórz jedno w zakładce Generuj.",
+          pick_event_first: "Najpierw wybierz wydarzenie",
+          camera_unavailable: "Kamera niedostępna",
+          camera_denied:
+            "Brak zgody lub nie znaleziono kamery. Jeśli otworzono to w oknie czatu, spróbuj otworzyć aplikację w osobnej karcie przeglądarki.",
+          valid_welcome: "Ważny - zapraszamy!",
+          checked_in_num: (n) => `Bilet ${n} odprawiony.`,
+          already_used: "JUŻ WYKORZYSTANY",
+          checked_at: (when) => `Odprawiony o ${when}. Możliwy duplikat.`,
+          unknown_ticket: "Nieznany bilet",
+          unknown_ticket_sub: "Ten kod nie pasuje do żadnego biletu - prawdopodobnie fałszywy.",
+          not_ticketguard: "To nie jest kod TicketGuard",
+          not_ticketguard_sub: "Ten kod QR nie został wygenerowany przez tę aplikację.",
+          malformed_sub: "Ten kod QR nie ma poprawnego identyfikatora biletu.",
+          wrong_event: "Niewłaściwe wydarzenie",
+          wrong_event_sub: "Ten bilet należy do innego wydarzenia.",
+          unknown_offline: "Nieznany bilet (offline)",
+          unknown_offline_sub: "Nie ma go na liście wczytanej dla tego wydarzenia - nie można potwierdzić bez sieci.",
+          already_used_offline: "JUŻ WYKORZYSTANY (offline)",
+          marked_used_at: (when) => `Oznaczony jako wykorzystany o ${when} na tym telefonie.`,
+          valid_offline: "Ważny - zapraszamy! (offline)",
+          checked_in_offline: (n) => `Bilet ${n} odprawiony - potwierdzimy po powrocie sieci.`,
+          auth_problem: (n) =>
+            `<b>Problem z logowaniem lub uprawnieniami</b> - to nie tylko brak wifi; odprawy mogą się nie potwierdzić nawet po powrocie sygnału. Spróbuj wylogować się i zalogować ponownie. (oczekujących odpraw: ${n})`,
+          offline_saving: (n) =>
+            `Offline - odprawy zapisywane na tym telefonie: ${n}, potwierdzimy po ponownym połączeniu.`,
+          conflict_note: (n, list) => `⚠ bilety odprawione także gdzie indziej: ${n} - sprawdź ponownie: ${list}`,
+          stats_line: (used, remaining, total) =>
+            `<span><b>${used}</b> odprawionych</span>&nbsp;&nbsp;<span><b>${remaining}</b> pozostało z ${total}</span>`,
+        },
+        en: {
+          signout: "Sign out",
+          login_title: "Staff sign-in",
+          email: "Email",
+          password: "Password",
+          signin: "Sign in",
+          signin_failed: "Sign-in failed.",
+          enter_both: "Enter both email and password.",
+          not_configured: "Firebase isn't configured yet - paste your config near the top of the file.",
+          tab_generate: "Generate",
+          tab_scan: "Scan door",
+          storage_memory:
+            "Running in this-session-only mode - Firebase isn't connected, or the security rules are rejecting reads/writes. Tickets made now won't be shared across devices or survive a reload.",
+          new_event_name: "New event name",
+          event_name_ph: "e.g. Autumn Book Club Night",
+          num_tickets: "Number of tickets",
+          create_event: "Create event & generate tickets",
+          generating: "Generating...",
+          creating_tickets: "Creating tickets...",
+          name_first: "Give the event a name first.",
+          done_created: (n) => `Done - ${n} tickets created.`,
+          could_not_save: (m) => "Could not save: " + m,
+          past_events: "Past events",
+          no_events_gen: "No events yet. Create one above.",
+          event_meta: (n, d) => `${n} tickets · created ${d}`,
+          view: "View →",
+          delete: "Delete",
+          deleting: "Deleting...",
+          delete_title: "Delete this event",
+          confirm_delete: (name, n) => `Delete "${name}" and its ${n} tickets? This cannot be undone.`,
+          total: "total",
+          checked_in: "checked in",
+          remaining: "remaining",
+          from_num: "From #",
+          to_num: "To #",
+          print_range: "Print this range",
+          print_all: "Print all",
+          batch_hint:
+            "Handing tickets out as people register at the desk? Print a small batch at a time (e.g. tickets 1-10) instead of the whole run - write the person's name on it if you want a record of who has which one.",
+          backup_btn: "Download emergency backup list",
+          backup_hint:
+            "A plain numbered list, no app or internet needed - print it and bring it to the door in case the scanner or the network is down. Cross off numbers by hand as people arrive.",
+          ticket_no: "Ticket No.",
+          backup_intro: (date, total) =>
+            `Emergency backup checklist - use only if the scanner or internet is unavailable\nCheck BOTH the ticket number and the code match what's printed on the paper ticket before crossing it off.\nGenerated ${date}\nTotal tickets: ${total}`,
+          backup_row: (num, code) => `Ticket ${num}   Code: ${code}   [ ]  checked in`,
+          which_event: "Which event is this?",
+          choose_event: "Choose an event...",
+          start_camera: "Start camera",
+          stop_camera: "Stop camera",
+          no_events_scan: "No events yet - create one in the Generate tab first.",
+          pick_event_first: "Pick an event first",
+          camera_unavailable: "Camera unavailable",
+          camera_denied:
+            "Permission denied or no camera found. If you opened this inside a chat window, try opening the app in its own browser tab.",
+          valid_welcome: "Valid - welcome!",
+          checked_in_num: (n) => `Ticket ${n} checked in.`,
+          already_used: "ALREADY USED",
+          checked_at: (when) => `Checked in at ${when}. Possible duplicate.`,
+          unknown_ticket: "Unknown ticket",
+          unknown_ticket_sub: "This code doesn't match any ticket on file - likely a fake.",
+          not_ticketguard: "Not a TicketGuard code",
+          not_ticketguard_sub: "This QR code was not generated by this app.",
+          malformed_sub: "This QR code is missing or has a malformed ticket id.",
+          wrong_event: "Wrong event",
+          wrong_event_sub: "This ticket belongs to a different event.",
+          unknown_offline: "Unknown ticket (offline)",
+          unknown_offline_sub: "Not on the list loaded for this event - can't confirm while offline.",
+          already_used_offline: "ALREADY USED (offline)",
+          marked_used_at: (when) => `Marked used at ${when} on this phone.`,
+          valid_offline: "Valid - welcome! (offline)",
+          checked_in_offline: (n) => `Ticket ${n} checked in - will confirm once back online.`,
+          auth_problem: (n) =>
+            `<b>Sign-in or permissions problem</b> - this isn't just a dead wifi signal; check-ins may not confirm even once you have signal back. Try signing out and back in. (${n} check-in(s) still waiting to confirm.)`,
+          offline_saving: (n) => `Offline - ${n} check-in(s) saving on this phone, will confirm once reconnected.`,
+          conflict_note: (n, list) =>
+            `⚠ ${n} ticket(s) turned out to be checked in elsewhere too - please recheck: ${list}`,
+          stats_line: (used, remaining, total) =>
+            `<span><b>${used}</b> checked in</span>&nbsp;&nbsp;<span><b>${remaining}</b> remaining of ${total}</span>`,
+        },
+      };
+      let LANG = "pl";
+      try {
+        const savedLang = localStorage.getItem("tg_lang");
+        if (savedLang === "en" || savedLang === "pl") LANG = savedLang;
+      } catch (e) {
+        /* ignore */
+      }
+      function t(key, ...args) {
+        const v = (I18N[LANG] && I18N[LANG][key]) ?? I18N.en[key] ?? key;
+        return typeof v === "function" ? v(...args) : v;
+      }
+      function applyStaticI18n() {
+        document.documentElement.lang = LANG;
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          el.textContent = t(el.dataset.i18n);
+        });
+        document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+          el.setAttribute("placeholder", t(el.dataset.i18nPh));
+        });
+        const lt = document.getElementById("lang-toggle");
+        if (lt) lt.textContent = LANG === "pl" ? "EN" : "PL";
+      }
+      function setLang(l) {
+        LANG = l === "en" ? "en" : "pl";
+        try {
+          localStorage.setItem("tg_lang", LANG);
+        } catch (e) {
+          /* ignore */
+        }
+        applyStaticI18n();
+        renderStorageBanner();
+        const appVisible = document.getElementById("app-content").style.display !== "none";
+        if (appVisible) {
+          const scan = document.getElementById("panel-scan");
+          if (scan && scan.style.display !== "none") renderScanPanel();
+          else renderGeneratePanel();
+        }
+      }
+
       function initFirebase() {
         if (firebaseConfig.apiKey.startsWith("PASTE_")) return false;
         try {
@@ -417,8 +640,7 @@
         if (!el) return;
         if (STORAGE_MODE === "memory") {
           el.style.display = "block";
-          el.innerHTML =
-            "Running in <b>this-session-only</b> mode - Firebase isn\u2019t connected, or the security rules are rejecting reads/writes. Tickets made now won\u2019t be shared across devices or survive a reload.";
+          el.textContent = t("storage_memory");
         } else {
           el.style.display = "none";
         }
@@ -615,11 +837,11 @@
 
         el.innerHTML = `
     <div class="card">
-      <label>New event name</label>
-      <input type="text" id="ev-name" placeholder="e.g. Autumn Book Club Night">
-      <label>Number of tickets</label>
+      <label>${t("new_event_name")}</label>
+      <input type="text" id="ev-name" placeholder="${t("event_name_ph")}">
+      <label>${t("num_tickets")}</label>
       <input type="number" id="ev-count" min="1" max="500" value="50">
-      <button class="btn-primary" id="btn-create-event">Create event & generate tickets</button>
+      <button class="btn-primary" id="btn-create-event">${t("create_event")}</button>
       <div id="gen-status" style="margin-top:10px;font-size:13px;min-height:18px;"></div>
     </div>
     <div id="events-list"></div>
@@ -636,13 +858,13 @@
           const name = document.getElementById("ev-name").value.trim().slice(0, 120);
           const count = Math.max(1, Math.min(500, parseInt(document.getElementById("ev-count").value) || 0));
           if (!name) {
-            setStatus("Give the event a name first.", true);
+            setStatus(t("name_first"), true);
             return;
           }
           const btn = document.getElementById("btn-create-event");
           btn.disabled = true;
-          btn.textContent = "Generating...";
-          setStatus("Creating tickets...", false);
+          btn.textContent = t("generating");
+          setStatus(t("creating_tickets"), false);
 
           const eventId = uid() + "-" + Date.now().toString(36);
           const tickets = [];
@@ -660,34 +882,34 @@
             const events = await getEvents();
             events.unshift(ev);
             await saveEvents(events);
-            setStatus("Done - " + count + " tickets created.", false);
+            setStatus(t("done_created", count), false);
             renderGeneratePanel();
             renderTicketsForPrint(ev, tickets);
           } catch (e) {
-            setStatus("Could not save: " + (e && e.message ? e.message : String(e)), true);
+            setStatus(t("could_not_save", e && e.message ? e.message : String(e)), true);
             btn.disabled = false;
-            btn.textContent = "Create event & generate tickets";
+            btn.textContent = t("create_event");
           }
         };
 
         const listEl = document.getElementById("events-list");
         if (events.length === 0) {
-          listEl.innerHTML = '<div class="empty">No events yet. Create one above.</div>';
+          listEl.innerHTML = `<div class="empty">${t("no_events_gen")}</div>`;
         } else {
           listEl.innerHTML =
-            '<h3 style="margin-bottom:10px;font-size:16px;">Past events</h3>' +
+            `<h3 style="margin-bottom:10px;font-size:16px;">${t("past_events")}</h3>` +
             events
               .map(
                 (ev) => `
         <div class="event-row" data-id="${ev.id}">
           <div>
             <div style="font-weight:600;">${escapeHtml(ev.name)}</div>
-            <div class="meta">${ev.count} tickets · created ${new Date(ev.createdAt).toLocaleDateString()}</div>
+            <div class="meta">${t("event_meta", ev.count, new Date(ev.createdAt).toLocaleDateString())}</div>
           </div>
           <div style="display:flex;align-items:center;gap:12px;">
-            <span class="meta">View →</span>
-            <button class="btn-delete-event" data-id="${ev.id}" title="Delete this event"
-              style="background:transparent;border:1.5px solid var(--stamp-red);color:var(--stamp-red);padding:6px 10px;font-size:13px;">Delete</button>
+            <span class="meta">${t("view")}</span>
+            <button class="btn-delete-event" data-id="${ev.id}" title="${t("delete_title")}"
+              style="background:transparent;border:1.5px solid var(--stamp-red);color:var(--stamp-red);padding:6px 10px;font-size:13px;">${t("delete")}</button>
           </div>
         </div>
       `,
@@ -705,9 +927,9 @@
               e.stopPropagation(); // don't also open the event's ticket view
               const ev = events.find((x) => x.id === btn.dataset.id);
               if (!ev) return;
-              if (!confirm(`Delete "${ev.name}" and its ${ev.count} tickets? This cannot be undone.`)) return;
+              if (!confirm(t("confirm_delete", ev.name, ev.count))) return;
               btn.disabled = true;
-              btn.textContent = "Deleting...";
+              btn.textContent = t("deleting");
               await deleteEvent(ev.id);
               const out = document.getElementById("tickets-output");
               if (out) out.innerHTML = "";
@@ -731,25 +953,25 @@
     <div class="card no-print">
       <h3>${escapeHtml(ev.name)}</h3>
       <div class="stats">
-        <span><b>${tickets.length}</b> total</span>
-        <span><b>${usedCount}</b> checked in</span>
-        <span><b>${tickets.length - usedCount}</b> remaining</span>
+        <span><b>${tickets.length}</b> ${t("total")}</span>
+        <span><b>${usedCount}</b> ${t("checked_in")}</span>
+        <span><b>${tickets.length - usedCount}</b> ${t("remaining")}</span>
       </div>
       <div style="margin-top:14px;display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
         <div>
-          <label style="margin-bottom:4px;">From #</label>
+          <label style="margin-bottom:4px;">${t("from_num")}</label>
           <input type="number" id="range-from" min="1" max="${tickets.length}" value="1" style="width:90px;margin-bottom:0;">
         </div>
         <div>
-          <label style="margin-bottom:4px;">To #</label>
+          <label style="margin-bottom:4px;">${t("to_num")}</label>
           <input type="number" id="range-to" min="1" max="${tickets.length}" value="${Math.min(10, tickets.length)}" style="width:90px;margin-bottom:0;">
         </div>
-        <button class="btn-secondary" id="btn-print-range">Print this range</button>
-        <button class="btn-secondary" id="btn-print-all">Print all</button>
+        <button class="btn-secondary" id="btn-print-range">${t("print_range")}</button>
+        <button class="btn-secondary" id="btn-print-all">${t("print_all")}</button>
       </div>
-      <div style="font-size:12px;color:#8a8272;margin-top:8px;">Handing tickets out as people register at the desk? Print a small batch at a time (e.g. tickets 1-10) instead of the whole run - write the person's name on it if you want a record of who has which one.</div>
-      <button class="btn-secondary" style="margin-top:14px;" id="btn-backup-list">Download emergency backup list</button>
-      <div style="font-size:12px;color:#8a8272;margin-top:8px;">A plain numbered list, no app or internet needed - print it and bring it to the door in case the scanner or the network is down. Cross off numbers by hand as people arrive.</div>
+      <div style="font-size:12px;color:#8a8272;margin-top:8px;">${t("batch_hint")}</div>
+      <button class="btn-secondary" style="margin-top:14px;" id="btn-backup-list">${t("backup_btn")}</button>
+      <div style="font-size:12px;color:#8a8272;margin-top:8px;">${t("backup_hint")}</div>
     </div>
     <div class="ticket-grid" id="ticket-grid"></div>
   `;
@@ -774,13 +996,13 @@
       function drawTicketGrid(ev, tickets) {
         const grid = document.getElementById("ticket-grid");
         grid.innerHTML = "";
-        tickets.forEach((t) => {
+        tickets.forEach((ticket) => {
           const wrap = document.createElement("div");
           wrap.className = "ticket";
-          wrap.innerHTML = `<div class="ticket-label">Ticket No.</div><div class="num">${String(t.num).padStart(3, "0")}</div><div class="code">${t.shortCode || ""}</div><div class="qr"></div><div class="event-name">${escapeHtml(ev.name)}</div>`;
+          wrap.innerHTML = `<div class="ticket-label">${t("ticket_no")}</div><div class="num">${String(ticket.num).padStart(3, "0")}</div><div class="code">${ticket.shortCode || ""}</div><div class="qr"></div><div class="event-name">${escapeHtml(ev.name)}</div>`;
           grid.appendChild(wrap);
           new QRCode(wrap.querySelector(".qr"), {
-            text: JSON.stringify({ e: ev.id, t: t.id }),
+            text: JSON.stringify({ e: ev.id, t: ticket.id }),
             width: 120,
             height: 120,
             colorDark: "#1D2B36",
@@ -792,11 +1014,9 @@
       function downloadBackupList(ev, tickets) {
         const rows = [...tickets]
           .sort((a, b) => a.num - b.num)
-          .map((t) => `Ticket ${String(t.num).padStart(3, "0")}   Code: ${t.shortCode || "?????"}   [ ]  checked in`)
+          .map((ticket) => t("backup_row", String(ticket.num).padStart(3, "0"), ticket.shortCode || "?????"))
           .join("\n");
-        const content =
-          `${ev.name}\nEmergency backup checklist - use only if the scanner or internet is unavailable\nCheck BOTH the ticket number and the code match what's printed on the paper ticket before crossing it off.\nGenerated ${new Date().toLocaleString()}\nTotal tickets: ${tickets.length}\n\n` +
-          rows;
+        const content = `${ev.name}\n${t("backup_intro", new Date().toLocaleString(), tickets.length)}\n\n` + rows;
         const blob = new Blob([content], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -853,18 +1073,18 @@
         const events = await getEvents();
         el.innerHTML = `
     <div class="card">
-      <label>Which event is this?</label>
+      <label>${t("which_event")}</label>
       <select id="scan-event" style="width:100%;padding:12px;border-radius:6px;border:1.5px solid var(--oat-deep);font-size:16px;background:var(--paper);margin-bottom:14px;">
-        <option value="">Choose an event...</option>
+        <option value="">${t("choose_event")}</option>
         ${events.map((ev) => `<option value="${ev.id}">${escapeHtml(ev.name)}</option>`).join("")}
       </select>
-      <button class="btn-primary" id="btn-start-scan">Start camera</button>
+      <button class="btn-primary" id="btn-start-scan">${t("start_camera")}</button>
     </div>
     <div id="scan-area"></div>
   `;
         if (events.length === 0) {
           el.querySelector(".card").innerHTML +=
-            '<div class="empty" style="padding:10px 0 0;">No events yet - create one in the Generate tab first.</div>';
+            `<div class="empty" style="padding:10px 0 0;">${t("no_events_scan")}</div>`;
         }
         document.getElementById("btn-start-scan").onclick = startScanning;
       }
@@ -874,7 +1094,7 @@
         currentEventId = sel.value;
         if (!currentEventId) {
           const area = document.getElementById("scan-area");
-          area.innerHTML = '<div class="result-banner invalid" style="display:block;">Pick an event first</div>';
+          area.innerHTML = `<div class="result-banner invalid" style="display:block;">${t("pick_event_first")}</div>`;
           return;
         }
         // Fresh session: clear anything left over from a previous event or a
@@ -899,7 +1119,7 @@
     <div id="sync-note" style="text-align:center;font-size:12px;color:#8a8272;margin-top:8px;"></div>
     <div class="stats" id="scan-stats" style="justify-content:center;"></div>
     <div style="text-align:center;margin-top:14px;">
-      <button class="btn-secondary" id="btn-stop-scan">Stop camera</button>
+      <button class="btn-secondary" id="btn-stop-scan">${t("stop_camera")}</button>
     </div>
   `;
         document.getElementById("btn-stop-scan").onclick = stopScanning;
@@ -945,7 +1165,7 @@
           await video.play();
           tick(video);
         } catch (e) {
-          area.innerHTML = `<div class="result-banner invalid" style="display:block;">Camera unavailable<div class="sub">${escapeHtml(e.message || "Permission denied or no camera found. If you opened this inside a chat window, try opening the app in its own browser tab.")}</div></div>`;
+          area.innerHTML = `<div class="result-banner invalid" style="display:block;">${t("camera_unavailable")}<div class="sub">${escapeHtml(e.message || t("camera_denied"))}</div></div>`;
         }
         updateStats();
       }
@@ -1006,20 +1226,20 @@
         try {
           parsed = JSON.parse(payload);
         } catch (e) {
-          showResult(false, "Not a TicketGuard code", "This QR code was not generated by this app.");
+          showResult(false, t("not_ticketguard"), t("not_ticketguard_sub"));
           return;
         }
 
         if (!parsed || typeof parsed !== "object") {
-          showResult(false, "Not a TicketGuard code", "This QR code was not generated by this app.");
+          showResult(false, t("not_ticketguard"), t("not_ticketguard_sub"));
           return;
         }
         if (parsed.e !== currentEventId) {
-          showResult(false, "Wrong event", "This ticket belongs to a different event.");
+          showResult(false, t("wrong_event"), t("wrong_event_sub"));
           return;
         }
         if (typeof parsed.t !== "string" || !TICKET_ID_RE.test(parsed.t)) {
-          showResult(false, "Not a TicketGuard code", "This QR code is missing or has a malformed ticket id.");
+          showResult(false, t("not_ticketguard"), t("malformed_sub"));
           return;
         }
         processCheckIn(parsed.t);
@@ -1034,17 +1254,17 @@
         const result = await tryCheckIn(ticketId);
 
         if (result.status === "ok") {
-          showResult(true, "Valid - welcome!", `Ticket ${String(result.num).padStart(3, "0")} checked in.`);
+          showResult(true, t("valid_welcome"), t("checked_in_num", String(result.num).padStart(3, "0")));
           bumpLocalCount();
           return;
         }
         if (result.status === "used") {
           const when = result.usedAt ? new Date(result.usedAt).toLocaleTimeString() : "earlier";
-          showResult(false, "ALREADY USED", `Checked in at ${when}. Possible duplicate.`);
+          showResult(false, t("already_used"), t("checked_at", when));
           return;
         }
         if (result.status === "unknown") {
-          showResult(false, "Unknown ticket", "This code doesn\u2019t match any ticket on file - likely a fake.");
+          showResult(false, t("unknown_ticket"), t("unknown_ticket_sub"));
           return;
         }
 
@@ -1052,29 +1272,21 @@
         // to the local copy loaded at scan-start so the door keeps moving; this
         // ticket gets queued and re-checked live the moment the connection returns.
         if (result.reason === "auth") authIssue = true;
-        const idx = localTickets.findIndex((t) => t.id === ticketId);
+        const idx = localTickets.findIndex((x) => x.id === ticketId);
         if (idx === -1) {
-          showResult(
-            false,
-            "Unknown ticket (offline)",
-            "Not on the list loaded for this event - can\u2019t confirm while offline.",
-          );
+          showResult(false, t("unknown_offline"), t("unknown_offline_sub"));
           return;
         }
         const ticket = localTickets[idx];
         if (ticket.used) {
           const when = new Date(ticket.usedAt).toLocaleTimeString();
-          showResult(false, "ALREADY USED (offline)", `Marked used at ${when} on this phone.`);
+          showResult(false, t("already_used_offline"), t("marked_used_at", when));
           return;
         }
         ticket.used = true;
         ticket.usedAt = new Date().toISOString();
         pendingQueue.push(ticketId);
-        showResult(
-          true,
-          "Valid - welcome! (offline)",
-          `Ticket ${String(ticket.num).padStart(3, "0")} checked in - will confirm once back online.`,
-        );
+        showResult(true, t("valid_offline"), t("checked_in_offline", String(ticket.num).padStart(3, "0")));
         bumpLocalCount();
         pendingSync = true;
         renderSyncNote();
@@ -1140,8 +1352,8 @@
             /* keep local */
           }
         }
-        const used = tickets.filter((t) => t.used).length;
-        statsEl.innerHTML = `<span><b>${used}</b> checked in</span>&nbsp;&nbsp;<span><b>${tickets.length - used}</b> remaining of ${tickets.length}</span>`;
+        const used = tickets.filter((x) => x.used).length;
+        statsEl.innerHTML = t("stats_line", used, tickets.length - used, tickets.length);
       }
 
       function renderSyncNote() {
@@ -1149,19 +1361,17 @@
         if (!el) return;
         if (authIssue) {
           el.style.color = "var(--stamp-red)";
-          el.innerHTML = `<b>Sign-in or permissions problem</b> - this isn\u2019t just a dead wifi signal; check-ins may not confirm even once you have signal back. Try signing out and back in. (${pendingQueue.length} check-in(s) still waiting to confirm.)`;
+          el.innerHTML = t("auth_problem", pendingQueue.length);
           return;
         }
         el.style.color = "#8a8272";
         let msg = "";
         if (pendingSync) {
-          msg = `Offline - ${pendingQueue.length} check-in(s) saving on this phone, will confirm once reconnected.`;
+          msg = t("offline_saving", pendingQueue.length);
         }
         if (conflicts.length) {
-          msg +=
-            (msg ? " " : "") +
-            `⚠ ${conflicts.length} ticket(s) turned out to be checked in elsewhere too - please recheck: ` +
-            conflicts.map((c) => "#" + String(c.num).padStart(3, "0")).join(", ");
+          const list = conflicts.map((c) => "#" + String(c.num).padStart(3, "0")).join(", ");
+          msg += (msg ? " " : "") + t("conflict_note", conflicts.length, list);
         }
         el.textContent = msg;
       }
@@ -1182,19 +1392,23 @@
         const statusEl = document.getElementById("login-status");
         statusEl.textContent = "";
         if (!firebaseReady) {
-          statusEl.textContent = "Firebase isn\u2019t configured yet - paste your config near the top of the file.";
+          statusEl.textContent = t("not_configured");
           return;
         }
         if (!email || !password) {
-          statusEl.textContent = "Enter both email and password.";
+          statusEl.textContent = t("enter_both");
           return;
         }
         try {
           await firebase.auth().signInWithEmailAndPassword(email, password);
         } catch (e) {
-          statusEl.textContent = e.message || "Sign-in failed.";
+          statusEl.textContent = e.message || t("signin_failed");
         }
       };
+
+      // Language toggle (top bar): swap PL <-> EN and re-render visible text.
+      applyStaticI18n();
+      document.getElementById("lang-toggle").onclick = () => setLang(LANG === "pl" ? "en" : "pl");
 
       if (firebaseReady) {
         firebase.auth().onAuthStateChanged(async (user) => {
@@ -1202,7 +1416,8 @@
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("app-content").style.display = "block";
             document.getElementById("topbar-right").innerHTML =
-              escapeHtml(user.email) + ' &nbsp; <a href="#" id="btn-logout" style="color:inherit;">Sign out</a>';
+              escapeHtml(user.email) +
+              ' &nbsp; <a href="#" id="btn-logout" data-i18n="signout" style="color:inherit;">Sign out</a>';
             document.getElementById("btn-logout").onclick = (e) => {
               e.preventDefault();
               firebase.auth().signOut();

@@ -34,6 +34,8 @@ const SHIM = `
   get pendingSync(){ return pendingSync },
   get lastDecodeTime(){ return (typeof lastDecodeTime!=='undefined')?lastDecodeTime:null },
   get CODE_ALPHABET(){ return CODE_ALPHABET },
+  get LANG(){ return LANG },
+  setLang, applyStaticI18n, t,
   tryCheckIn, processCheckIn, handleScan, retrySync,
   getTickets, createTickets, deleteEvent, getEvents, saveEvents,
   genShortCode, escapeHtml, uid, downloadBackupList,
@@ -133,6 +135,10 @@ async function loadApp(backend, opts = {}) {
       window.print = () => {};
       // --- confirm() defaults to true in tests (delete flows use it) ---
       window.confirm = () => true;
+      // --- language: tests default to English so text assertions are stable;
+      //     pass { lang: null } to exercise the real default (Polish), or a code ---
+      const lang = opts.lang === undefined ? 'en' : opts.lang;
+      if (lang) window.localStorage.setItem('tg_lang', lang);
       // --- seed localStorage to simulate a page reload carrying prior state ---
       if (opts.seedStorage) {
         for (const [k, v] of Object.entries(opts.seedStorage)) {

@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Polish / English language support**: the interface defaults to Polish, with
+  a language toggle in the top bar; the choice is remembered per browser. Covers
+  all visible labels and messages (Firebase's own error strings are passed
+  through). Code identifiers and stored data are unaffected.
 - **Delete event**: a Delete button on each event in the Generate tab (with a
   confirmation) removes the event and all of its ticket documents, and clears its
   offline cache.
