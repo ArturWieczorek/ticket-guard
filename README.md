@@ -94,6 +94,7 @@ happy paths. See [CONTRIBUTING.md](./CONTRIBUTING.md) and, for AI agents,
 
 - [docs/SETUP.md](docs/SETUP.md) - Firebase + GitHub Pages, step by step.
 - [docs/DOOR-PROCEDURE.md](docs/DOOR-PROCEDURE.md) - printable one-pager for staff at the door (PL/EN).
+- [docs/FIREBASE-PLAN.md](docs/FIREBASE-PLAN.md) - free vs. paid Firebase plan, budget alerts, anti-abuse.
 - [SECURITY.md](./SECURITY.md) - threat model, hardening, how to report issues.
 - [docs/DESIGN.md](docs/DESIGN.md) - architecture and the reasoning behind it.
 - [CHANGELOG.md](./CHANGELOG.md) - notable changes.

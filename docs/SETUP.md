@@ -19,6 +19,11 @@ Firebase is Google's free backend. On the free **Spark** plan you do **not** nee
 a credit card. It stores which tickets exist and which have been used, and it
 handles staff sign-in.
 
+> The free plan has a daily usage limit; if you expect a large event or want no
+> chance of a mid-event cutoff, see [FIREBASE-PLAN.md](FIREBASE-PLAN.md) for the
+> free-vs-paid comparison, how to set a budget alert, and how to lock down the
+> public API key.
+
 ### A1. Create a project
 
 1. Go to <https://console.firebase.google.com/> and sign in with a Google account.

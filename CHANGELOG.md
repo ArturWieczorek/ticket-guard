@@ -29,6 +29,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   again. (The other tests mock these libraries and can't catch a bad URL.)
 - **`docs/DOOR-PROCEDURE.md`**: a printable one-pager (PL/EN) telling staff what
   each scanner result means and what to do (admit / do not admit / use paper).
+- **`docs/FIREBASE-PLAN.md`**: free (Spark) vs. paid (Blaze) comparison, the daily
+  limits, when/whether to upgrade, how to set a budget alert, and how to lock down
+  the public API key (allowlist rules, sign-up off, API-key website restriction,
+  App Check).
 
 ### Changed
 
