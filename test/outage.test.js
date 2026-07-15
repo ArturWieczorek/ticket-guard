@@ -1,28 +1,19 @@
 'use strict';
-// FLOW B and the wider outage surface: network drops, cold starts, reloads,
-// and telling a dead-wifi outage apart from a broken sign-in.
-//
-// Several of these assert the DESIRED behavior that the hardening pass adds
-// (cold-start-from-cache, reload-survives-queue). They are expected to be RED
-// against the original index.html and GREEN after the fix - that is the TDD
-// record for this change.
+// Online-only verdicts. A ticket is declared valid/used ONLY by the shared
+// database (the tryCheckIn transaction). With no connection the app must NOT
+// guess from any cache - it says "can't verify, use the paper list" and changes
+// nothing. This spec locks in that safety property.
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { createBackend } = require('./mocks/backend');
-const { loadApp, tick } = require('./mocks/loader');
 const { bootApp, seedEvent, startScan } = require('./mocks/helpers');
 
 function bannerText(app) {
   const el = app.window.document.getElementById('result-banner');
   return el ? el.textContent : '';
 }
-function syncNoteText(app) {
-  const el = app.window.document.getElementById('sync-note');
-  return el ? el.textContent : '';
-}
 
-test('mid-session drop: an offline check-in is accepted, queued, and shown as offline', async () => {
+test('offline: the app refuses to guess - shows "can\'t verify" and does NOT touch the DB', async () => {
   const { backend, app } = await bootApp();
   const { eventId, tickets } = await seedEvent(app, 'Jazz Evening', 4);
   await startScan(app, eventId);
@@ -30,169 +21,63 @@ test('mid-session drop: an offline check-in is accepted, queued, and shown as of
   backend.setFailMode('network');
   await app.__t.processCheckIn(tickets[0].id);
 
-  assert.match(bannerText(app), /Valid/, 'door keeps moving while offline');
-  assert.strictEqual([...app.__t.pendingQueue].length, 1);
-  assert.match(syncNoteText(app), /Offline/);
-  app.close();
-});
-
-test('reconnect: retrySync drains the queue and the check-in reaches the backend', async () => {
-  const { backend, app } = await bootApp();
-  const { eventId, tickets } = await seedEvent(app, 'Jazz Evening', 4);
-  await startScan(app, eventId);
-
-  backend.setFailMode('network');
-  await app.__t.processCheckIn(tickets[0].id);
-  assert.strictEqual([...app.__t.pendingQueue].length, 1);
-
-  backend.setFailMode(null);
-  await app.__t.retrySync();
-
-  assert.strictEqual([...app.__t.pendingQueue].length, 0, 'queue drained');
+  assert.match(bannerText(app), /verify|zweryfik/i, 'shows a can-not-verify message');
+  assert.doesNotMatch(bannerText(app), /Valid|welcome|Ważny/i, 'never claims valid offline');
   assert.strictEqual(
     backend.dump('ticketguard_tickets')[tickets[0].id].used,
-    true,
-    'reached shared DB',
+    false,
+    'the ticket is left untouched in the DB',
   );
   app.close();
 });
 
-test('conflict: a ticket used elsewhere while offline is surfaced, not dropped', async () => {
-  const backend = createBackend();
-  const a = await loadApp(backend);
-  const b = await loadApp(backend);
-  await a.signIn('a@lib.org', 'pw');
-  await b.signIn('b@lib.org', 'pw');
-  const { eventId, tickets } = await seedEvent(a, 'Lecture', 3);
-  await tick(a.window, 5);
-  await startScan(a, eventId);
-
-  // Phone B (online) checks the ticket in first.
-  await b.__t.tryCheckIn(tickets[0].id);
-
-  // Phone A was offline and also "accepted" it, then reconnects.
-  backend.setFailMode('network');
-  await a.__t.processCheckIn(tickets[0].id);
-  backend.setFailMode(null);
-  await a.__t.retrySync();
-
-  assert.strictEqual([...a.__t.conflicts].length, 1, 'the double check-in is flagged for staff');
-  assert.match(syncNoteText(a), /recheck/i);
-  a.close();
-  b.close();
-});
-
-test('auth failure is distinguished from a network outage (urgent, self-help message)', async () => {
+test('offline due to an auth/permissions problem shows a sign-in oriented message', async () => {
   const { backend, app } = await bootApp();
   const { eventId, tickets } = await seedEvent(app, 'Workshop', 3);
   await startScan(app, eventId);
 
-  backend.setFailMode('auth'); // e.g. sign-in expired mid-event
+  backend.setFailMode('auth');
   await app.__t.processCheckIn(tickets[0].id);
 
-  assert.strictEqual(app.__t.authIssue, true);
-  assert.match(syncNoteText(app), /sign-?in|permission/i);
+  assert.match(bannerText(app), /sign-?in|permission|logowan|uprawnie/i);
+  assert.strictEqual(backend.dump('ticketguard_tickets')[tickets[0].id].used, false);
   app.close();
 });
 
-test('COLD START offline: a scanner opened with no network still loads the last cached list', async () => {
-  // Device A caches the list during a normal (online) scan session.
-  const backend = createBackend();
-  const a = await loadApp(backend);
-  await a.signIn('a@lib.org', 'pw');
-  const { eventId, tickets } = await seedEvent(a, 'Community Fair', 6);
-  await tick(a.window, 5);
-  await startScan(a, eventId);
-  const storage = a.dumpStorage();
-  a.close();
+test('once the network returns, the live verdict works again', async () => {
+  const { backend, app } = await bootApp();
+  const { eventId, tickets } = await seedEvent(app, 'Recital', 3);
+  await startScan(app, eventId);
 
-  // Device B reopens later with the network already dead, carrying that cache.
-  const b = await loadApp(backend, { seedStorage: storage });
-  await b.signIn('b@lib.org', 'pw');
-  backend.setFailMode('network'); // dead before the session even starts
-  await startScan(b, eventId);
+  backend.setFailMode('network');
+  await app.__t.processCheckIn(tickets[0].id); // can't verify, no change
+  assert.strictEqual(backend.dump('ticketguard_tickets')[tickets[0].id].used, false);
 
-  assert.strictEqual([...b.__t.localTickets].length, 6, 'cold-start loads the cached ticket list');
-  // and can still check people in against it
-  await b.__t.processCheckIn(tickets[0].id);
-  assert.match(bannerText(b), /Valid/);
-  b.close();
+  backend.setFailMode(null);
+  await app.__t.processCheckIn(tickets[0].id); // now the DB decides
+  assert.match(bannerText(app), /Valid|welcome/i);
+  assert.strictEqual(backend.dump('ticketguard_tickets')[tickets[0].id].used, true);
+  app.close();
 });
 
-test('a stale cache must NOT override the DB: a ticket the DB says is free stays free', async () => {
-  // Regression: the scanner and the desktop disagreed because a cached "used"
-  // flag (not backed by a pending sync) overrode the authoritative DB.
+test('a leftover local scan cache is ignored entirely (no cache-based verdicts)', async () => {
   const { backend, app } = await bootApp();
   const { eventId, tickets } = await seedEvent(app, 'Spotkanie autorskie', 3);
-  // DB: all unused. Poison the local cache: ticket[0] used, but NOT pending.
+  // Plant an old-style cache that (wrongly) marks ticket[0] used. The app must
+  // never read it; ticket[0] is unused in the DB.
   app.window.localStorage.setItem(
     'tg_scan_' + eventId,
-    JSON.stringify({
-      tickets: tickets.map((t, i) => ({
-        ...t,
-        used: i === 0,
-        usedAt: i === 0 ? '2026-07-15T10:00:00.000Z' : null,
-      })),
-      pending: [],
-    }),
-  );
-  await startScan(app, eventId); // online
-
-  const t0 = [...app.__t.localTickets].find((x) => x.id === tickets[0].id);
-  assert.strictEqual(t0.used, false, 'scanner trusts the DB (unused), not the stale cache');
-  app.close();
-});
-
-test('the cache DOES preserve an own offline check-in that is still pending sync', async () => {
-  const { app } = await bootApp();
-  const { eventId, tickets } = await seedEvent(app, 'Pending Preserve', 3);
-  // ticket[0] used locally AND still queued for sync -> must stay marked used.
-  app.window.localStorage.setItem(
-    'tg_scan_' + eventId,
-    JSON.stringify({
-      tickets: tickets.map((t, i) => ({
-        ...t,
-        used: i === 0,
-        usedAt: i === 0 ? '2026-07-15T10:00:00.000Z' : null,
-      })),
-      pending: [tickets[0].id],
-    }),
+    JSON.stringify({ tickets: tickets.map((t, i) => ({ ...t, used: i === 0 })), pending: [] }),
   );
   await startScan(app, eventId);
-  const t0 = [...app.__t.localTickets].find((x) => x.id === tickets[0].id);
-  assert.strictEqual(t0.used, true, 'my own unsynced check-in is preserved');
-  assert.ok([...app.__t.pendingQueue].includes(tickets[0].id), 'and it is queued to sync');
+
+  // Online: the DB says free -> a scan checks it in (valid), not "already used".
+  await app.__t.processCheckIn(tickets[0].id);
+  assert.match(bannerText(app), /Valid|welcome/i, 'DB is authoritative, stale cache ignored');
+
+  // And offline it would say can't-verify, never "already used" from the cache.
+  backend.setFailMode('network');
+  await app.__t.processCheckIn(tickets[1].id);
+  assert.match(bannerText(app), /verify|zweryfik/i);
   app.close();
-});
-
-test('RELOAD safety: queued offline check-ins survive a tab reload and still sync', async () => {
-  const backend = createBackend();
-  const a = await loadApp(backend);
-  await a.signIn('a@lib.org', 'pw');
-  const { eventId, tickets } = await seedEvent(a, 'Story Hour', 5);
-  await tick(a.window, 5);
-  await startScan(a, eventId);
-
-  backend.setFailMode('network');
-  await a.__t.processCheckIn(tickets[0].id); // accepted offline, queued only in memory on the old code
-  assert.strictEqual([...a.__t.pendingQueue].length, 1);
-  const storage = a.dumpStorage();
-  a.close(); // tab closed/reloaded before reconnect
-
-  // Reload: fresh window, same origin storage, network still down at first.
-  const b = await loadApp(backend, { seedStorage: storage });
-  await b.signIn('a@lib.org', 'pw');
-  backend.setFailMode('network');
-  await startScan(b, eventId);
-  assert.strictEqual(
-    [...b.__t.pendingQueue].length,
-    1,
-    'the queued check-in was not lost on reload',
-  );
-
-  // Now the network returns and the check-in finally reaches the DB.
-  backend.setFailMode(null);
-  await b.__t.retrySync();
-  assert.strictEqual(backend.dump('ticketguard_tickets')[tickets[0].id].used, true);
-  b.close();
 });

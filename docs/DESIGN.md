@@ -74,17 +74,19 @@ Two phones scanning _different_ tickets never interfere.
 
 ## Offline / emergency model
 
-Three layers, escalating as more fails:
+Verdicts are **online-only** by design. This is a deliberate correctness choice
+for a door where a wrong call is unacceptable: a ticket is declared valid or
+already-used **only** by the shared database (the `tryCheckIn` transaction), so
+the exactly-once guarantee is absolute and two devices can never disagree.
 
-1. **Network drops mid-event.** Scanning falls back to a list cached at session
-   start; check-ins are queued locally, shown as "offline", and synced by
-   `retrySync()` when the connection returns. A scanner that _started_ offline
-   re-probes storage on reconnect so its queued check-ins still land. If the same
-   ticket was used elsewhere while offline, it's flagged for staff to recheck.
-2. **Cold start / reload offline.** The ticket list, events index, and queued
-   check-ins are persisted to `localStorage`, so a scanner opened with no network -
-   or reloaded before reconnecting - still works and doesn't lose queued check-ins.
-3. **Everything down (no app, no power).** Each printed ticket carries its number,
+Two layers, escalating as more fails:
+
+1. **Network drops at the door.** The app does not guess from any cache. A scan
+   shows "can't verify - use the paper list" and changes nothing. (An earlier
+   design cached tickets and let the scanner check people in offline; it was
+   removed because offline devices cannot coordinate, so it could not guarantee
+   exactly-once and caused the scanner and the event view to disagree.)
+2. **Everything down (no app, no power).** Each printed ticket carries its number,
    code, and QR; a downloadable plain-text **backup checklist** (generated fully
    client-side) lets staff cross off arrivals by hand, matching both the number
    and the code. This is the true emergency path - the only caveat is that the app

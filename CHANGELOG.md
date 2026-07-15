@@ -13,7 +13,6 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   last time), newest first, persisted across reloads. It does not affect entry -
   the real-time "already used" banner still blocks duplicates on every device -
   it is purely a local record.
-
 - **Used-ticket marking in the event view**: checked-in tickets are dimmed with a
   red border and a "Used" stamp. The view auto-refreshes every few seconds (and
   has a Refresh button), updating the marks and counts in place without redrawing
@@ -24,28 +23,28 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   all visible labels and messages (Firebase's own error strings are passed
   through). Code identifiers and stored data are unaffected.
 - **Delete event**: a Delete button on each event in the Generate tab (with a
-  confirmation) removes the event and all of its ticket documents, and clears its
-  offline cache.
+  confirmation) removes the event and all of its ticket documents.
 - A test (`test/cdn-links.test.js`) that fetches every `<script src>` CDN URL in
   `index.html` and fails if any is unreachable, so a dead link can't regress
   again. (The other tests mock these libraries and can't catch a bad URL.)
 
-### Fixed
-
-- **Scanner/desktop disagreement**: a stale per-device offline cache could mark a
-  ticket "used" even when the shared database said it was free, so the scanner and
-  the event view disagreed. The cache now only preserves a device's own
-  not-yet-synced check-ins; the database is otherwise authoritative.
-
 ### Changed
 
+- **Online-only verdicts (safety).** A ticket is now declared valid/used ONLY by
+  the shared database. Removed offline check-in and its per-device cache/queue:
+  with no connection the scanner shows "can't verify - use the paper list" and
+  changes nothing. This makes the exactly-once guarantee absolute and removes any
+  chance of the scanner and the event view disagreeing. The printed backup
+  checklist remains the outage procedure.
 - The "Start camera" button is disabled (greyed) while a scan session is running;
   the "Stop camera" button ends it. Prevents starting twice.
 
-### Fixed (earlier)
+### Fixed
 
 - Corrected the jsQR library URL - the previous cdnjs path returned 404, which
   broke the door scanner ("jsQR is not defined"). Now loaded from jsDelivr.
+- (Superseded by the online-only change above) A stale per-device cache could
+  briefly disagree with the database; the cache was removed entirely.
 
 ## [1.0.0] - 2026-07-15
 
