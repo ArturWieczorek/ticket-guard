@@ -53,6 +53,8 @@ jobs:
           mkdir -p _site
           cp index.html _site/index.html
           cp 404.html _site/404.html
+          # Custom domain: GitHub Pages serves the site at this host.
+          echo 'bilety.arturwieczorek.com' > _site/CNAME
 
       - uses: actions/configure-pages@v5
 
