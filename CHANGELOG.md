@@ -32,6 +32,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Scanner/desktop disagreement**: a stale per-device offline cache could mark a
+  ticket "used" even when the shared database said it was free, so the scanner and
+  the event view disagreed. The cache now only preserves a device's own
+  not-yet-synced check-ins; the database is otherwise authoritative.
+
+### Changed
+
+- The "Start camera" button is disabled (greyed) while a scan session is running;
+  the "Stop camera" button ends it. Prevents starting twice.
+
+### Fixed (earlier)
+
 - Corrected the jsQR library URL - the previous cdnjs path returned 404, which
   broke the door scanner ("jsQR is not defined"). Now loaded from jsDelivr.
 

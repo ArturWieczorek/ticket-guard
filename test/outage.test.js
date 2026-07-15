@@ -119,6 +119,52 @@ test('COLD START offline: a scanner opened with no network still loads the last 
   b.close();
 });
 
+test('a stale cache must NOT override the DB: a ticket the DB says is free stays free', async () => {
+  // Regression: the scanner and the desktop disagreed because a cached "used"
+  // flag (not backed by a pending sync) overrode the authoritative DB.
+  const { backend, app } = await bootApp();
+  const { eventId, tickets } = await seedEvent(app, 'Spotkanie autorskie', 3);
+  // DB: all unused. Poison the local cache: ticket[0] used, but NOT pending.
+  app.window.localStorage.setItem(
+    'tg_scan_' + eventId,
+    JSON.stringify({
+      tickets: tickets.map((t, i) => ({
+        ...t,
+        used: i === 0,
+        usedAt: i === 0 ? '2026-07-15T10:00:00.000Z' : null,
+      })),
+      pending: [],
+    }),
+  );
+  await startScan(app, eventId); // online
+
+  const t0 = [...app.__t.localTickets].find((x) => x.id === tickets[0].id);
+  assert.strictEqual(t0.used, false, 'scanner trusts the DB (unused), not the stale cache');
+  app.close();
+});
+
+test('the cache DOES preserve an own offline check-in that is still pending sync', async () => {
+  const { app } = await bootApp();
+  const { eventId, tickets } = await seedEvent(app, 'Pending Preserve', 3);
+  // ticket[0] used locally AND still queued for sync -> must stay marked used.
+  app.window.localStorage.setItem(
+    'tg_scan_' + eventId,
+    JSON.stringify({
+      tickets: tickets.map((t, i) => ({
+        ...t,
+        used: i === 0,
+        usedAt: i === 0 ? '2026-07-15T10:00:00.000Z' : null,
+      })),
+      pending: [tickets[0].id],
+    }),
+  );
+  await startScan(app, eventId);
+  const t0 = [...app.__t.localTickets].find((x) => x.id === tickets[0].id);
+  assert.strictEqual(t0.used, true, 'my own unsynced check-in is preserved');
+  assert.ok([...app.__t.pendingQueue].includes(tickets[0].id), 'and it is queued to sync');
+  app.close();
+});
+
 test('RELOAD safety: queued offline check-ins survive a tab reload and still sync', async () => {
   const backend = createBackend();
   const a = await loadApp(backend);

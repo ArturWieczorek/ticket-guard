@@ -1312,10 +1312,19 @@
         // but haven't reached the shared DB yet, and resume a queue left by a reload.
         const cache = loadScanCache(currentEventId);
         if (cache && Array.isArray(cache.tickets)) {
+          const pendingIds = new Set(Array.isArray(cache.pending) ? cache.pending : []);
           if (!localTickets || localTickets.length === 0) {
+            // Cold start with no network: the cache is all we have to go on.
             localTickets = cache.tickets;
           } else {
-            const cachedUsed = new Map(cache.tickets.filter((t) => t.used).map((t) => [t.id, t.usedAt]));
+            // Online (fresh DB list loaded): the DB is authoritative. Only preserve
+            // a locally-marked "used" flag for check-ins THIS device made offline
+            // and has NOT synced yet (still queued). Never let a stale cache mark a
+            // ticket used when the DB says it is free - that caused the scanner and
+            // the desktop to disagree.
+            const cachedUsed = new Map(
+              cache.tickets.filter((t) => t.used && pendingIds.has(t.id)).map((t) => [t.id, t.usedAt]),
+            );
             localTickets.forEach((t) => {
               if (cachedUsed.has(t.id) && !t.used) {
                 t.used = true;
@@ -1336,6 +1345,11 @@
         lastDecodeTime = 0;
         lastDecodeData = null;
 
+        // Grey out "Start camera" while a session is running; the "Stop camera"
+        // button below ends it (and re-renders an enabled Start button).
+        const startBtn = document.getElementById("btn-start-scan");
+        if (startBtn) startBtn.disabled = true;
+
         const video = document.getElementById("scan-video");
         try {
           scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
@@ -1343,6 +1357,7 @@
           await video.play();
           tick(video);
         } catch (e) {
+          if (startBtn) startBtn.disabled = false; // let them retry
           area.innerHTML = `<div class="result-banner invalid" style="display:block;">${t("camera_unavailable")}<div class="sub">${escapeHtml(e.message || t("camera_denied"))}</div></div>`;
         }
         updateStats();
