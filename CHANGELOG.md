@@ -1,0 +1,54 @@
+# Changelog
+
+All notable changes to this project are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to
+follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.0.0] - 2026-07-15
+
+First professional, tested release.
+
+### Added
+
+- **Automated test suite** (`test/`): ~35 tests run with Node's built-in test
+  runner against a faithful Firebase mock (real optimistic-concurrency
+  transactions, injectable network/auth failures). Covers concurrency, outage /
+  offline, security, functional flows, and auth gating.
+- **Offline persistence**: the ticket list, the events index, and any
+  not-yet-synced check-ins are cached in `localStorage`, so a scanner can
+  cold-start with no network and survive a tab reload without losing queued
+  check-ins.
+- **Reconnect re-probe**: a scanner that started offline now re-probes storage
+  when the network returns, so its queued check-ins actually reach the shared
+  database.
+- Tooling: ESLint (flat config, incl. `@html-eslint`), Prettier, markdownlint,
+  EditorConfig.
+- CI (GitHub Actions) that lints, checks formatting, and runs tests, then deploys
+  to GitHub Pages only when they pass.
+- Documentation: `README`, `docs/SETUP.md` (Firebase + GitHub Pages for
+  first-timers), `SECURITY.md` (threat model + audit), `docs/DESIGN.md`,
+  `CONTRIBUTING.md`, `AGENTS.md`, and an MIT `LICENSE`.
+
+### Changed
+
+- **Scan debounce** now debounces only *repeats* of the same code, so two
+  different tickets scanned within ~1.2 s are both accepted (previously the second
+  was silently dropped).
+- Firestore rules guidance hardened to a **staff email allowlist**, with public
+  sign-up disabled (see `SECURITY.md`).
+
+### Security
+
+- **QR / ticket-id validation** in the scan handler: malformed, missing,
+  oversized, non-string, or path-like ids are rejected before reaching Firestore.
+- **Cryptographic RNG** for the printed short codes (was `Math.random()`).
+
+### Fixed
+
+- `downloadBackupList` no longer sorts its input array in place.
+- Event-name input is length-capped.
+
+[Unreleased]: https://github.com/<your-username>/<repo>/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/<your-username>/<repo>/releases/tag/v1.0.0

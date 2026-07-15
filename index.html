@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>TicketGuard - Library Event Tickets</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <style>
+      :root {
+        --ink: #1d2b36;
+        --oat: #ede6d6;
+        --oat-deep: #e1d7bf;
+        --brass: #b8934a;
+        --forest: #3f6e52;
+        --stamp-red: #a13d3d;
+        --paper: #f7f3e9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--oat);
+        color: var(--ink);
+        font-family:
+          "IBM Plex Sans",
+          -apple-system,
+          sans-serif;
+        min-height: 100vh;
+      }
+      @font-face {
+        font-family: "FraunFallback";
+        src: local("Georgia");
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: "Fraunces", Georgia, serif;
+        font-weight: 600;
+        margin: 0;
+      }
+      .topbar {
+        background: var(--ink);
+        color: var(--paper);
+        padding: 18px 20px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      .topbar .brand {
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 22px;
+        letter-spacing: 0.3px;
+      }
+      .topbar .brand span {
+        color: var(--brass);
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--paper);
+        border-bottom: 1px solid var(--oat-deep);
+      }
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 14px 8px;
+        cursor: pointer;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: #8a8272;
+        border-bottom: 3px solid transparent;
+        user-select: none;
+      }
+      .tab.active {
+        color: var(--ink);
+        border-bottom: 3px solid var(--brass);
+        font-weight: 600;
+      }
+      .panel {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 22px 18px 60px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: #6b6455;
+        margin-bottom: 6px;
+      }
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1.5px solid var(--oat-deep);
+        border-radius: 6px;
+        font-size: 16px;
+        background: var(--paper);
+        color: var(--ink);
+        margin-bottom: 16px;
+      }
+      input:focus {
+        outline: 2px solid var(--brass);
+        outline-offset: 1px;
+      }
+      button {
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 13px 20px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        letter-spacing: 0.2px;
+      }
+      .btn-primary {
+        background: var(--ink);
+        color: var(--paper);
+        width: 100%;
+      }
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-secondary {
+        background: transparent;
+        color: var(--ink);
+        border: 1.5px solid var(--ink);
+      }
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--oat-deep);
+        border-radius: 10px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+      .event-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 14px;
+        background: var(--paper);
+        border: 1px solid var(--oat-deep);
+        border-radius: 8px;
+        margin-bottom: 10px;
+        cursor: pointer;
+      }
+      .event-row:hover {
+        border-color: var(--brass);
+      }
+      .event-row .meta {
+        font-size: 13px;
+        color: #7a7364;
+      }
+      .ticket-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 18px;
+      }
+      @media (max-width: 480px) {
+        .ticket-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .ticket {
+        background: var(--paper);
+        border: 2px dashed var(--brass);
+        border-radius: 4px;
+        padding: 14px;
+        text-align: center;
+        position: relative;
+      }
+      .ticket .ticket-label {
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #8a8272;
+        margin-bottom: 2px;
+      }
+      .ticket .num {
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 34px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: 1px;
+        line-height: 1.1;
+        margin-bottom: 8px;
+      }
+      .ticket .code {
+        font-family: "Courier New", monospace;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--forest);
+        letter-spacing: 3px;
+        margin-bottom: 8px;
+      }
+      .ticket canvas,
+      .ticket img {
+        max-width: 100%;
+        height: auto;
+      }
+      .ticket .event-name {
+        font-size: 12px;
+        margin-top: 6px;
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .scan-stage {
+        position: relative;
+        width: 100%;
+        max-width: 420px;
+        margin: 0 auto;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #000;
+        aspect-ratio: 1/1;
+      }
+      .scan-stage video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .scan-frame {
+        position: absolute;
+        inset: 14%;
+        border: 3px solid rgba(247, 243, 233, 0.8);
+        border-radius: 12px;
+        pointer-events: none;
+      }
+      .result-banner {
+        margin-top: 18px;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 22px;
+        font-weight: 600;
+        display: none;
+      }
+      .result-banner.valid {
+        background: var(--forest);
+        color: white;
+        display: block;
+      }
+      .result-banner.invalid {
+        background: var(--stamp-red);
+        color: white;
+        display: block;
+      }
+      .result-banner .sub {
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 400;
+        margin-top: 6px;
+        opacity: 0.9;
+      }
+      .stats {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        font-size: 13px;
+        color: #6b6455;
+      }
+      .stats b {
+        color: var(--ink);
+        font-size: 16px;
+      }
+      .empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: #8a8272;
+      }
+      @media print {
+        .topbar,
+        .tabs,
+        .no-print {
+          display: none !important;
+        }
+        body {
+          background: white;
+        }
+        .ticket {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand">Ticket<span>Guard</span></div>
+      <div id="topbar-right" style="font-size: 12px; opacity: 0.7"></div>
+    </div>
+
+    <div id="login-screen" style="max-width: 360px; margin: 60px auto; padding: 0 18px">
+      <div class="card">
+        <h3 style="margin-bottom: 14px">Staff sign-in</h3>
+        <label>Email</label>
+        <input type="text" id="login-email" autocomplete="username" inputmode="email" />
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="current-password" />
+        <button class="btn-primary" id="btn-login">Sign in</button>
+        <div
+          id="login-status"
+          style="margin-top: 10px; font-size: 13px; min-height: 18px; color: var(--stamp-red)"
+        ></div>
+      </div>
+    </div>
+
+    <div id="app-content" style="display: none">
+      <div class="tabs no-print">
+        <div class="tab active" data-tab="generate">Generate</div>
+        <div class="tab" data-tab="scan">Scan door</div>
+      </div>
+
+      <div
+        id="storage-banner"
+        class="no-print"
+        style="
+          display: none;
+          background: var(--brass);
+          color: var(--ink);
+          font-size: 13px;
+          padding: 10px 16px;
+          text-align: center;
+        "
+      ></div>
+
+      <div class="panel" id="panel-generate"></div>
+      <div class="panel" id="panel-scan" style="display: none"></div>
+    </div>
+
+    <script>
+      // ============ FIREBASE SETUP ============
+      // Full step-by-step guide (Firebase + GitHub Pages): docs/SETUP.md
+      //
+      // Quick version:
+      //  1. Create a Firebase project; add a Web app; copy its config below.
+      //  2. Enable Firestore. In Authentication, enable Email/Password AND turn
+      //     OFF public sign-up (Authentication > Settings > User actions), then
+      //     add your staff users manually.
+      //  3. Paste your config values over the PASTE_* placeholders below.
+      //     (These values are PUBLIC by design - the security boundary is the
+      //     Firestore rules + Auth, not hiding this config. See SECURITY.md.)
+      //  4. Paste these Firestore rules (Firestore > Rules), listing your staff
+      //     sign-in emails - this is what actually protects the data:
+      //
+      //     rules_version = '2';
+      //     service cloud.firestore {
+      //       match /databases/{database}/documents {
+      //         function isStaff() {
+      //           return request.auth != null && request.auth.token.email in [
+      //             'librarian1@example.org',
+      //             'librarian2@example.org'
+      //           ];
+      //         }
+      //         match /{document=**} { allow read, write: if isStaff(); }
+      //       }
+      //     }
+      const firebaseConfig = {
+        apiKey: "PASTE_YOUR_API_KEY",
+        authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+        projectId: "PASTE_YOUR_PROJECT_ID",
+        storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+        messagingSenderId: "PASTE_YOUR_SENDER_ID",
+        appId: "PASTE_YOUR_APP_ID",
+      };
+
+      let STORAGE_MODE = "checking"; // 'firebase' | 'memory'
+      const memoryStore = {};
+      let db = null;
+      let firebaseReady = false;
+
+      function initFirebase() {
+        if (firebaseConfig.apiKey.startsWith("PASTE_")) return false;
+        try {
+          firebase.initializeApp(firebaseConfig);
+          db = firebase.firestore();
+          firebaseReady = true;
+          return true;
+        } catch (e) {
+          console.warn("Firebase init failed", e);
+          return false;
+        }
+      }
+
+      async function storageTest() {
+        try {
+          if (!firebaseReady) throw new Error("Firebase config not filled in yet, or Firestore not created");
+          // quick round-trip to confirm rules/connection are working
+          await db.collection("ticketguard").doc("selftest").set({ pingedAt: Date.now() });
+          await db.collection("ticketguard").doc("selftest").get();
+          STORAGE_MODE = "firebase";
+        } catch (e) {
+          STORAGE_MODE = "memory";
+          console.warn("Firebase unavailable, using in-memory fallback:", e);
+        }
+        renderStorageBanner();
+      }
+
+      function renderStorageBanner() {
+        const el = document.getElementById("storage-banner");
+        if (!el) return;
+        if (STORAGE_MODE === "memory") {
+          el.style.display = "block";
+          el.innerHTML =
+            "Running in <b>this-session-only</b> mode - Firebase isn\u2019t connected, or the security rules are rejecting reads/writes. Tickets made now won\u2019t be shared across devices or survive a reload.";
+        } else {
+          el.style.display = "none";
+        }
+      }
+
+      // Mirror small key-value docs (the events index) into localStorage too, so the
+      // event list is still there for a fully-offline COLD START - without it, the
+      // scan dropdown would be empty and staff couldn't even pick the event.
+      function lsGet(key) {
+        try {
+          const v = localStorage.getItem("tg_kv_" + key);
+          return v ? JSON.parse(v) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+      function lsSet(key, value) {
+        try {
+          localStorage.setItem("tg_kv_" + key, JSON.stringify(value));
+        } catch (e) {}
+      }
+
+      // low-level storage with fallback
+      async function storeGet(key) {
+        if (STORAGE_MODE === "memory") return lsGet(key) ?? memoryStore[key] ?? null;
+        try {
+          const doc = await db.collection("ticketguard").doc(key).get();
+          const val = doc.exists ? doc.data().value : null;
+          if (val !== null) lsSet(key, val); // refresh the offline mirror
+          return val !== null ? val : lsGet(key);
+        } catch (e) {
+          console.warn("Read failed, falling back to cached/memory for", key, e);
+          return lsGet(key) ?? memoryStore[key] ?? null;
+        }
+      }
+      async function storeSet(key, value) {
+        lsSet(key, value); // always mirror for offline use
+        if (STORAGE_MODE === "memory") {
+          memoryStore[key] = value;
+          return;
+        }
+        try {
+          await db.collection("ticketguard").doc(key).set({ value, updatedAt: Date.now() });
+        } catch (e) {
+          console.warn("Write failed, falling back to memory for", key, e);
+          STORAGE_MODE = "memory";
+          memoryStore[key] = value;
+          renderStorageBanner();
+        }
+      }
+
+      // ---------- storage helpers ----------
+      // Events list stays as one small document - only ever written by whoever is
+      // generating tickets, so there's no concurrent-writer risk there.
+      async function getEvents() {
+        const v = await storeGet("events-index");
+        try {
+          return v ? JSON.parse(v) : [];
+        } catch (e) {
+          return [];
+        }
+      }
+      async function saveEvents(list) {
+        await storeSet("events-index", JSON.stringify(list));
+      }
+
+      // Tickets are stored ONE PER DOCUMENT (not as one shared array) specifically
+      // so that two scanner phones checking in different tickets at the same
+      // moment never overwrite each other's work.
+      async function createTickets(eventId, tickets) {
+        if (STORAGE_MODE === "firebase") {
+          const batch = db.batch();
+          tickets.forEach((t) => {
+            batch.set(db.collection("ticketguard_tickets").doc(t.id), {
+              eventId,
+              num: t.num,
+              shortCode: t.shortCode,
+              used: false,
+              usedAt: null,
+            });
+          });
+          await batch.commit();
+        } else {
+          tickets.forEach((t) => {
+            memoryStore["ticket:" + t.id] = { eventId, num: t.num, shortCode: t.shortCode, used: false, usedAt: null };
+          });
+        }
+      }
+
+      async function getTickets(eventId) {
+        if (STORAGE_MODE === "firebase") {
+          try {
+            const snap = await db.collection("ticketguard_tickets").where("eventId", "==", eventId).get();
+            const list = [];
+            snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+            list.sort((a, b) => a.num - b.num);
+            return list;
+          } catch (e) {
+            console.warn("Ticket read failed, falling back to memory", e);
+          }
+        }
+        return Object.keys(memoryStore)
+          .filter((k) => k.startsWith("ticket:") && memoryStore[k].eventId === eventId)
+          .map((k) => ({ id: k.slice(7), ...memoryStore[k] }))
+          .sort((a, b) => a.num - b.num);
+      }
+
+      // Atomic "mark this one ticket used, only if it isn't already" - safe even
+      // if two phones scan two different tickets, or (rarer) the same ticket, in
+      // the same instant. Returns one of: ok / used / unknown / offline.
+      async function tryCheckIn(ticketId) {
+        if (STORAGE_MODE !== "firebase") return { status: "offline", reason: "network" };
+        try {
+          const ref = db.collection("ticketguard_tickets").doc(ticketId);
+          return await db.runTransaction(async (tx) => {
+            const doc = await tx.get(ref);
+            if (!doc.exists) return { status: "unknown" };
+            const data = doc.data();
+            if (data.used) return { status: "used", num: data.num, usedAt: data.usedAt };
+            const now = new Date().toISOString();
+            tx.update(ref, { used: true, usedAt: now });
+            return { status: "ok", num: data.num, usedAt: now };
+          });
+        } catch (e) {
+          // Tell a real outage apart from a sign-in/rules problem - the latter
+          // won't fix itself just because wifi comes back, and staff deserve to
+          // know that rather than being told "will sync once reconnected" forever.
+          const isAuthIssue = e && (e.code === "permission-denied" || e.code === "unauthenticated");
+          console.warn("Live check-in failed, falling back to offline mode", e);
+          return { status: "offline", reason: isAuthIssue ? "auth" : "network" };
+        }
+      }
+
+      function uid() {
+        if (crypto.randomUUID) return crypto.randomUUID().slice(0, 8).toUpperCase();
+        return Math.random().toString(36).slice(2, 10).toUpperCase();
+      }
+
+      // Short random code for the fully-analog fallback path. Deliberately NOT
+      // derived from the ticket number (which is sequential and guessable) - this
+      // is what a librarian checks by eye when there's no phone/app at all, so it
+      // needs to actually require having seen a real ticket, not just a plausible
+      // number in range. Ambiguous characters (0/O, 1/I) are excluded so it's easy
+      // to read and hand-write correctly.
+      const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      function genShortCode() {
+        // Use a cryptographic RNG rather than Math.random(). The alphabet is 32 chars
+        // and 256 is an exact multiple of 32, so a plain modulo is unbiased.
+        const bytes = new Uint8Array(5);
+        crypto.getRandomValues(bytes);
+        let s = "";
+        for (let i = 0; i < 5; i++) s += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+        return s;
+      }
+
+      // ---------- tabs ----------
+      document.querySelectorAll(".tab").forEach((t) => {
+        t.addEventListener("click", () => {
+          haltCamera(); // always release the camera before switching views, whichever tab was active
+          document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+          t.classList.add("active");
+          const tab = t.dataset.tab;
+          document.getElementById("panel-generate").style.display = tab === "generate" ? "block" : "none";
+          document.getElementById("panel-scan").style.display = tab === "scan" ? "block" : "none";
+          if (tab === "scan") renderScanPanel();
+        });
+      });
+
+      // ================= GENERATE PANEL =================
+      async function renderGeneratePanel() {
+        const el = document.getElementById("panel-generate");
+        const events = await getEvents();
+
+        el.innerHTML = `
+    <div class="card">
+      <label>New event name</label>
+      <input type="text" id="ev-name" placeholder="e.g. Autumn Book Club Night">
+      <label>Number of tickets</label>
+      <input type="number" id="ev-count" min="1" max="500" value="50">
+      <button class="btn-primary" id="btn-create-event">Create event & generate tickets</button>
+      <div id="gen-status" style="margin-top:10px;font-size:13px;min-height:18px;"></div>
+    </div>
+    <div id="events-list"></div>
+    <div id="tickets-output"></div>
+  `;
+
+        const statusEl = document.getElementById("gen-status");
+        const setStatus = (msg, isError) => {
+          statusEl.textContent = msg || "";
+          statusEl.style.color = isError ? "var(--stamp-red)" : "#6b6455";
+        };
+
+        document.getElementById("btn-create-event").onclick = async () => {
+          const name = document.getElementById("ev-name").value.trim().slice(0, 120);
+          const count = Math.max(1, Math.min(500, parseInt(document.getElementById("ev-count").value) || 0));
+          if (!name) {
+            setStatus("Give the event a name first.", true);
+            return;
+          }
+          const btn = document.getElementById("btn-create-event");
+          btn.disabled = true;
+          btn.textContent = "Generating...";
+          setStatus("Creating tickets...", false);
+
+          const eventId = uid() + "-" + Date.now().toString(36);
+          const tickets = [];
+          const usedCodes = new Set();
+          for (let i = 1; i <= count; i++) {
+            let code = genShortCode();
+            while (usedCodes.has(code)) code = genShortCode(); // vanishingly rare, but keep codes unique within this event
+            usedCodes.add(code);
+            tickets.push({ id: uid() + uid(), num: i, shortCode: code, used: false, usedAt: null });
+          }
+          const ev = { id: eventId, name, count, createdAt: new Date().toISOString() };
+
+          try {
+            await createTickets(eventId, tickets);
+            const events = await getEvents();
+            events.unshift(ev);
+            await saveEvents(events);
+            setStatus("Done - " + count + " tickets created.", false);
+            renderGeneratePanel();
+            renderTicketsForPrint(ev, tickets);
+          } catch (e) {
+            setStatus("Could not save: " + (e && e.message ? e.message : String(e)), true);
+            btn.disabled = false;
+            btn.textContent = "Create event & generate tickets";
+          }
+        };
+
+        const listEl = document.getElementById("events-list");
+        if (events.length === 0) {
+          listEl.innerHTML = '<div class="empty">No events yet. Create one above.</div>';
+        } else {
+          listEl.innerHTML =
+            '<h3 style="margin-bottom:10px;font-size:16px;">Past events</h3>' +
+            events
+              .map(
+                (ev) => `
+        <div class="event-row" data-id="${ev.id}">
+          <div>
+            <div style="font-weight:600;">${escapeHtml(ev.name)}</div>
+            <div class="meta">${ev.count} tickets · created ${new Date(ev.createdAt).toLocaleDateString()}</div>
+          </div>
+          <div class="meta">View →</div>
+        </div>
+      `,
+              )
+              .join("");
+          listEl.querySelectorAll(".event-row").forEach((row) => {
+            row.addEventListener("click", async () => {
+              const ev = events.find((e) => e.id === row.dataset.id);
+              const tickets = await getTickets(ev.id);
+              renderTicketsForPrint(ev, tickets);
+            });
+          });
+        }
+      }
+
+      function escapeHtml(s) {
+        return s.replace(
+          /[&<>"']/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+        );
+      }
+
+      function renderTicketsForPrint(ev, tickets) {
+        const out = document.getElementById("tickets-output");
+        const usedCount = tickets.filter((t) => t.used).length;
+        out.innerHTML = `
+    <div class="card no-print">
+      <h3>${escapeHtml(ev.name)}</h3>
+      <div class="stats">
+        <span><b>${tickets.length}</b> total</span>
+        <span><b>${usedCount}</b> checked in</span>
+        <span><b>${tickets.length - usedCount}</b> remaining</span>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+        <div>
+          <label style="margin-bottom:4px;">From #</label>
+          <input type="number" id="range-from" min="1" max="${tickets.length}" value="1" style="width:90px;margin-bottom:0;">
+        </div>
+        <div>
+          <label style="margin-bottom:4px;">To #</label>
+          <input type="number" id="range-to" min="1" max="${tickets.length}" value="${Math.min(10, tickets.length)}" style="width:90px;margin-bottom:0;">
+        </div>
+        <button class="btn-secondary" id="btn-print-range">Print this range</button>
+        <button class="btn-secondary" id="btn-print-all">Print all</button>
+      </div>
+      <div style="font-size:12px;color:#8a8272;margin-top:8px;">Handing tickets out as people register at the desk? Print a small batch at a time (e.g. tickets 1-10) instead of the whole run - write the person's name on it if you want a record of who has which one.</div>
+      <button class="btn-secondary" style="margin-top:14px;" id="btn-backup-list">Download emergency backup list</button>
+      <div style="font-size:12px;color:#8a8272;margin-top:8px;">A plain numbered list, no app or internet needed - print it and bring it to the door in case the scanner or the network is down. Cross off numbers by hand as people arrive.</div>
+    </div>
+    <div class="ticket-grid" id="ticket-grid"></div>
+  `;
+        document.getElementById("btn-backup-list").onclick = () => downloadBackupList(ev, tickets);
+        document.getElementById("btn-print-all").onclick = () => {
+          drawTicketGrid(ev, tickets);
+          window.print();
+        };
+        document.getElementById("btn-print-range").onclick = () => {
+          const from = parseInt(document.getElementById("range-from").value) || 1;
+          const to = parseInt(document.getElementById("range-to").value) || from;
+          const subset = tickets.filter((t) => t.num >= from && t.num <= to);
+          if (subset.length === 0) {
+            return;
+          }
+          drawTicketGrid(ev, subset);
+          window.print();
+        };
+        drawTicketGrid(ev, tickets);
+      }
+
+      function drawTicketGrid(ev, tickets) {
+        const grid = document.getElementById("ticket-grid");
+        grid.innerHTML = "";
+        tickets.forEach((t) => {
+          const wrap = document.createElement("div");
+          wrap.className = "ticket";
+          wrap.innerHTML = `<div class="ticket-label">Ticket No.</div><div class="num">${String(t.num).padStart(3, "0")}</div><div class="code">${t.shortCode || ""}</div><div class="qr"></div><div class="event-name">${escapeHtml(ev.name)}</div>`;
+          grid.appendChild(wrap);
+          new QRCode(wrap.querySelector(".qr"), {
+            text: JSON.stringify({ e: ev.id, t: t.id }),
+            width: 120,
+            height: 120,
+            colorDark: "#1D2B36",
+            colorLight: "#F7F3E9",
+          });
+        });
+      }
+
+      function downloadBackupList(ev, tickets) {
+        const rows = [...tickets]
+          .sort((a, b) => a.num - b.num)
+          .map((t) => `Ticket ${String(t.num).padStart(3, "0")}   Code: ${t.shortCode || "?????"}   [ ]  checked in`)
+          .join("\n");
+        const content =
+          `${ev.name}\nEmergency backup checklist - use only if the scanner or internet is unavailable\nCheck BOTH the ticket number and the code match what's printed on the paper ticket before crossing it off.\nGenerated ${new Date().toLocaleString()}\nTotal tickets: ${tickets.length}\n\n` +
+          rows;
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = ev.name.replace(/[^a-z0-9]+/gi, "-") + "-backup-list.txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      // ================= SCAN PANEL =================
+      let scanStream = null,
+        scanRAF = null,
+        currentEventId = null;
+      let localTickets = null; // working copy loaded once when scanning starts
+      let pendingSync = false; // true if local changes haven't reached the shared backend yet
+      let syncTimer = null;
+      let authIssue = false; // true if failures look like a sign-in/permissions problem, not a real outage
+
+      // ---------- offline cache (localStorage) ----------
+      // Persist the loaded ticket list AND any not-yet-synced check-ins for an event,
+      // so a scanner can (a) COLD-START with no network at all from the last cached
+      // list, and (b) survive a tab reload without losing queued offline check-ins.
+      // Best-effort only - private-mode/full storage failures are swallowed.
+      function scanCacheKey(eventId) {
+        return "tg_scan_" + eventId;
+      }
+      function saveScanCache() {
+        if (!currentEventId) return;
+        try {
+          localStorage.setItem(
+            scanCacheKey(currentEventId),
+            JSON.stringify({
+              tickets: localTickets || [],
+              pending: pendingQueue,
+            }),
+          );
+        } catch (e) {
+          /* storage unavailable/full - non-fatal, live path still works */
+        }
+      }
+      function loadScanCache(eventId) {
+        try {
+          const raw = localStorage.getItem(scanCacheKey(eventId));
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async function renderScanPanel() {
+        const el = document.getElementById("panel-scan");
+        const events = await getEvents();
+        el.innerHTML = `
+    <div class="card">
+      <label>Which event is this?</label>
+      <select id="scan-event" style="width:100%;padding:12px;border-radius:6px;border:1.5px solid var(--oat-deep);font-size:16px;background:var(--paper);margin-bottom:14px;">
+        <option value="">Choose an event...</option>
+        ${events.map((ev) => `<option value="${ev.id}">${escapeHtml(ev.name)}</option>`).join("")}
+      </select>
+      <button class="btn-primary" id="btn-start-scan">Start camera</button>
+    </div>
+    <div id="scan-area"></div>
+  `;
+        if (events.length === 0) {
+          el.querySelector(".card").innerHTML +=
+            '<div class="empty" style="padding:10px 0 0;">No events yet - create one in the Generate tab first.</div>';
+        }
+        document.getElementById("btn-start-scan").onclick = startScanning;
+      }
+
+      async function startScanning() {
+        const sel = document.getElementById("scan-event");
+        currentEventId = sel.value;
+        if (!currentEventId) {
+          const area = document.getElementById("scan-area");
+          area.innerHTML = '<div class="result-banner invalid" style="display:block;">Pick an event first</div>';
+          return;
+        }
+        // Fresh session: clear anything left over from a previous event or a
+        // previous stop/start cycle so old conflicts/pending items can't bleed in.
+        haltCamera();
+        if (syncTimer) {
+          clearInterval(syncTimer);
+          syncTimer = null;
+        }
+        pendingQueue.length = 0;
+        conflicts.length = 0;
+        pendingSync = false;
+        authIssue = false;
+
+        const area = document.getElementById("scan-area");
+        area.innerHTML = `
+    <div class="scan-stage">
+      <video id="scan-video" playsinline autoplay muted></video>
+      <div class="scan-frame"></div>
+    </div>
+    <div class="result-banner" id="result-banner"></div>
+    <div id="sync-note" style="text-align:center;font-size:12px;color:#8a8272;margin-top:8px;"></div>
+    <div class="stats" id="scan-stats" style="justify-content:center;"></div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn-secondary" id="btn-stop-scan">Stop camera</button>
+    </div>
+  `;
+        document.getElementById("btn-stop-scan").onclick = stopScanning;
+
+        // Load the ticket list ONCE. From here on, scanning works off this local
+        // copy so a dropped connection mid-event doesn't stop check-ins - it just
+        // delays syncing that data to other devices until the connection returns.
+        localTickets = await getTickets(currentEventId);
+
+        // Hydrate from the offline cache: fall back to it entirely on a cold start
+        // with no network, otherwise fold in any check-ins that were marked locally
+        // but haven't reached the shared DB yet, and resume a queue left by a reload.
+        const cache = loadScanCache(currentEventId);
+        if (cache && Array.isArray(cache.tickets)) {
+          if (!localTickets || localTickets.length === 0) {
+            localTickets = cache.tickets;
+          } else {
+            const cachedUsed = new Map(cache.tickets.filter((t) => t.used).map((t) => [t.id, t.usedAt]));
+            localTickets.forEach((t) => {
+              if (cachedUsed.has(t.id) && !t.used) {
+                t.used = true;
+                t.usedAt = cachedUsed.get(t.id);
+              }
+            });
+          }
+          if (Array.isArray(cache.pending) && cache.pending.length) {
+            cache.pending.forEach((id) => {
+              if (!pendingQueue.includes(id)) pendingQueue.push(id);
+            });
+            pendingSync = true;
+            renderSyncNote();
+            if (!syncTimer) syncTimer = setInterval(retrySync, 6000);
+          }
+        }
+        saveScanCache();
+        lastDecodeTime = 0;
+        lastDecodeData = null;
+
+        const video = document.getElementById("scan-video");
+        try {
+          scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+          video.srcObject = scanStream;
+          await video.play();
+          tick(video);
+        } catch (e) {
+          area.innerHTML = `<div class="result-banner invalid" style="display:block;">Camera unavailable<div class="sub">${escapeHtml(e.message || "Permission denied or no camera found. If you opened this inside a chat window, try opening the app in its own browser tab.")}</div></div>`;
+        }
+        updateStats();
+      }
+
+      function haltCamera() {
+        if (scanRAF) {
+          cancelAnimationFrame(scanRAF);
+          scanRAF = null;
+        }
+        if (scanStream) {
+          scanStream.getTracks().forEach((tr) => tr.stop());
+          scanStream = null;
+        }
+      }
+
+      function stopScanning() {
+        haltCamera();
+        if (syncTimer) {
+          clearInterval(syncTimer);
+          syncTimer = null;
+        }
+        renderScanPanel();
+      }
+
+      const canvasEl = document.createElement("canvas");
+      const ctx = canvasEl.getContext("2d", { willReadFrequently: true });
+      let lastDecodeTime = 0;
+      let lastDecodeData = null;
+
+      function tick(video) {
+        if (!scanStream) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvasEl.width = video.videoWidth;
+          canvasEl.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvasEl.width, canvasEl.height);
+          const imgData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+          const code = jsQR(imgData.data, imgData.width, imgData.height);
+          const now = Date.now();
+          // Debounce REPEATS of the same code (the camera decodes the same ticket many
+          // times a second), but let a DIFFERENT ticket through immediately so a busy
+          // door never silently drops the next guest.
+          if (code && (code.data !== lastDecodeData || now - lastDecodeTime > 1200)) {
+            lastDecodeTime = now;
+            lastDecodeData = code.data;
+            handleScan(code.data);
+          }
+        }
+        scanRAF = requestAnimationFrame(() => tick(video));
+      }
+
+      // A real ticket id is uid()+uid() - uppercase alphanumerics. Reject anything
+      // else up front (missing id, path traversal, slashes, oversized strings, or a
+      // non-string) rather than passing it to Firestore's .doc() and interpreting the
+      // resulting error as a network outage.
+      const TICKET_ID_RE = /^[A-Za-z0-9]{4,64}$/;
+      function handleScan(payload) {
+        let parsed;
+        try {
+          parsed = JSON.parse(payload);
+        } catch (e) {
+          showResult(false, "Not a TicketGuard code", "This QR code was not generated by this app.");
+          return;
+        }
+
+        if (!parsed || typeof parsed !== "object") {
+          showResult(false, "Not a TicketGuard code", "This QR code was not generated by this app.");
+          return;
+        }
+        if (parsed.e !== currentEventId) {
+          showResult(false, "Wrong event", "This ticket belongs to a different event.");
+          return;
+        }
+        if (typeof parsed.t !== "string" || !TICKET_ID_RE.test(parsed.t)) {
+          showResult(false, "Not a TicketGuard code", "This QR code is missing or has a malformed ticket id.");
+          return;
+        }
+        processCheckIn(parsed.t);
+      }
+
+      const pendingQueue = []; // ticketIds marked locally while offline, awaiting sync
+
+      async function processCheckIn(ticketId) {
+        // Live path first - this is what keeps two phones at the same door from
+        // both accepting the same ticket, since the transaction is resolved by
+        // the database itself, not by either phone's local memory.
+        const result = await tryCheckIn(ticketId);
+
+        if (result.status === "ok") {
+          showResult(true, "Valid - welcome!", `Ticket ${String(result.num).padStart(3, "0")} checked in.`);
+          bumpLocalCount();
+          return;
+        }
+        if (result.status === "used") {
+          const when = result.usedAt ? new Date(result.usedAt).toLocaleTimeString() : "earlier";
+          showResult(false, "ALREADY USED", `Checked in at ${when}. Possible duplicate.`);
+          return;
+        }
+        if (result.status === "unknown") {
+          showResult(false, "Unknown ticket", "This code doesn\u2019t match any ticket on file - likely a fake.");
+          return;
+        }
+
+        // status === 'offline': network/database unreachable right now. Fall back
+        // to the local copy loaded at scan-start so the door keeps moving; this
+        // ticket gets queued and re-checked live the moment the connection returns.
+        if (result.reason === "auth") authIssue = true;
+        const idx = localTickets.findIndex((t) => t.id === ticketId);
+        if (idx === -1) {
+          showResult(
+            false,
+            "Unknown ticket (offline)",
+            "Not on the list loaded for this event - can\u2019t confirm while offline.",
+          );
+          return;
+        }
+        const ticket = localTickets[idx];
+        if (ticket.used) {
+          const when = new Date(ticket.usedAt).toLocaleTimeString();
+          showResult(false, "ALREADY USED (offline)", `Marked used at ${when} on this phone.`);
+          return;
+        }
+        ticket.used = true;
+        ticket.usedAt = new Date().toISOString();
+        pendingQueue.push(ticketId);
+        showResult(
+          true,
+          "Valid - welcome! (offline)",
+          `Ticket ${String(ticket.num).padStart(3, "0")} checked in - will confirm once back online.`,
+        );
+        bumpLocalCount();
+        pendingSync = true;
+        renderSyncNote();
+        saveScanCache(); // persist so this check-in survives a reload before reconnect
+        if (!syncTimer) syncTimer = setInterval(retrySync, 6000);
+      }
+
+      async function retrySync() {
+        // A scanner that COLD-STARTED offline is pinned in memory mode (its startup
+        // storage probe failed). When the network returns we must re-probe, or its
+        // queued check-ins would never reach the shared DB. This is the crux of the
+        // "opened with no signal, reconnected later" emergency path.
+        if (STORAGE_MODE !== "firebase" && firebaseReady) {
+          await storageTest();
+        }
+        while (pendingQueue.length) {
+          const ticketId = pendingQueue[0];
+          const result = await tryCheckIn(ticketId);
+          if (result.status === "offline") {
+            if (result.reason === "auth") authIssue = true;
+            break; // still no connection (or still not signed in properly), try again later
+          }
+          pendingQueue.shift();
+          if (result.status === "used") {
+            // Someone else (or this same phone, earlier) already checked this
+            // ticket in elsewhere while this phone was offline - flag it so staff
+            // can double-check that guest rather than silently ignoring it.
+            flagConflict(ticketId, result.usedAt);
+          }
+        }
+        if (pendingQueue.length === 0) {
+          pendingSync = false;
+          if (syncTimer) {
+            clearInterval(syncTimer);
+            syncTimer = null;
+          }
+        }
+        saveScanCache(); // keep the persisted queue in step with what has synced
+        renderSyncNote();
+      }
+
+      const conflicts = [];
+      function flagConflict(ticketId, usedAt) {
+        const t = localTickets.find((x) => x.id === ticketId);
+        conflicts.push({ num: t ? t.num : "?", usedAt });
+        renderSyncNote();
+      }
+
+      function bumpLocalCount() {
+        updateStats(); // fire-and-forget refresh; doesn't block the next scan
+      }
+
+      async function updateStats() {
+        if (!currentEventId) return;
+        const statsEl = document.getElementById("scan-stats");
+        if (!statsEl) return;
+        // Prefer a fresh live count; fall back to the local cache if offline.
+        let tickets = localTickets;
+        if (STORAGE_MODE === "firebase") {
+          try {
+            tickets = await getTickets(currentEventId);
+          } catch (e) {
+            /* keep local */
+          }
+        }
+        const used = tickets.filter((t) => t.used).length;
+        statsEl.innerHTML = `<span><b>${used}</b> checked in</span>&nbsp;&nbsp;<span><b>${tickets.length - used}</b> remaining of ${tickets.length}</span>`;
+      }
+
+      function renderSyncNote() {
+        const el = document.getElementById("sync-note");
+        if (!el) return;
+        if (authIssue) {
+          el.style.color = "var(--stamp-red)";
+          el.innerHTML = `<b>Sign-in or permissions problem</b> - this isn\u2019t just a dead wifi signal; check-ins may not confirm even once you have signal back. Try signing out and back in. (${pendingQueue.length} check-in(s) still waiting to confirm.)`;
+          return;
+        }
+        el.style.color = "#8a8272";
+        let msg = "";
+        if (pendingSync) {
+          msg = `Offline - ${pendingQueue.length} check-in(s) saving on this phone, will confirm once reconnected.`;
+        }
+        if (conflicts.length) {
+          msg +=
+            (msg ? " " : "") +
+            `⚠ ${conflicts.length} ticket(s) turned out to be checked in elsewhere too - please recheck: ` +
+            conflicts.map((c) => "#" + String(c.num).padStart(3, "0")).join(", ");
+        }
+        el.textContent = msg;
+      }
+
+      function showResult(valid, title, sub) {
+        const banner = document.getElementById("result-banner");
+        if (!banner) return;
+        banner.className = "result-banner " + (valid ? "valid" : "invalid");
+        banner.innerHTML = `${title}<div class="sub">${sub}</div>`;
+      }
+
+      // ============ AUTH ============
+      initFirebase();
+
+      document.getElementById("btn-login").onclick = async () => {
+        const email = document.getElementById("login-email").value.trim();
+        const password = document.getElementById("login-password").value;
+        const statusEl = document.getElementById("login-status");
+        statusEl.textContent = "";
+        if (!firebaseReady) {
+          statusEl.textContent = "Firebase isn\u2019t configured yet - paste your config near the top of the file.";
+          return;
+        }
+        if (!email || !password) {
+          statusEl.textContent = "Enter both email and password.";
+          return;
+        }
+        try {
+          await firebase.auth().signInWithEmailAndPassword(email, password);
+        } catch (e) {
+          statusEl.textContent = e.message || "Sign-in failed.";
+        }
+      };
+
+      if (firebaseReady) {
+        firebase.auth().onAuthStateChanged(async (user) => {
+          if (user) {
+            document.getElementById("login-screen").style.display = "none";
+            document.getElementById("app-content").style.display = "block";
+            document.getElementById("topbar-right").innerHTML =
+              escapeHtml(user.email) + ' &nbsp; <a href="#" id="btn-logout" style="color:inherit;">Sign out</a>';
+            document.getElementById("btn-logout").onclick = (e) => {
+              e.preventDefault();
+              firebase.auth().signOut();
+            };
+            await storageTest();
+            renderGeneratePanel();
+          } else {
+            document.getElementById("login-screen").style.display = "block";
+            document.getElementById("app-content").style.display = "none";
+          }
+        });
+      } else {
+        document.getElementById("login-status").textContent =
+          "Firebase isn\u2019t configured yet - paste your config near the top of the file.";
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "ticketguard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Print and validate anti-counterfeiting QR tickets for library events, with a fully-offline paper fallback.",
+  "license": "MIT",
+  "homepage": "https://github.com/<your-username>/<repo>",
+  "scripts": {
+    "test": "node --test --test-force-exit \"test/**/*.test.js\"",
+    "lint": "eslint . && markdownlint-cli2 \"**/*.md\" \"#node_modules\"",
+    "lint:fix": "eslint . --fix && markdownlint-cli2 --fix \"**/*.md\" \"#node_modules\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "ci": "npm run lint && npm run format:check && npm test"
+  },
+  "devDependencies": {
+    "@html-eslint/eslint-plugin": "^0.27.0",
+    "@html-eslint/parser": "^0.27.0",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0",
+    "jsdom": "^26.0.0",
+    "markdownlint-cli2": "^0.14.0",
+    "prettier": "^3.3.3"
+  }
+}

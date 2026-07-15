@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Logs / debug
+npm-debug.log*
+*.log
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Local env (never commit real secrets)
+.env
+.env.*

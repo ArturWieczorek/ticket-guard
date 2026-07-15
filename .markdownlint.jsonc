@@ -1,0 +1,10 @@
+{
+  // Line length is handled by Prettier's prose wrap, not a hard limit here.
+  "MD013": false,
+  // Allow inline HTML (badges, details blocks) in Markdown.
+  "MD033": false,
+  // Allow the first line to be something other than a top-level heading.
+  "MD041": false,
+  // Duplicate headings are fine across different sections (e.g. "Firebase").
+  "MD024": { "siblings_only": true },
+}
